@@ -5,9 +5,7 @@ const { Pool } = require('pg');
 // Create connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? {
-    rejectUnauthorized: false  // Required for Neon and most cloud Postgres providers
-  } : false
+  ssl: { rejectUnauthorized: false }  // Required for Neon and most cloud Postgres providers
 });
 
 // Test connection on startup

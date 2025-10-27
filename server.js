@@ -47,6 +47,22 @@ app.get('/healthz', async (req, res) => {
   }
 });
 
+// Database probe endpoint - TEMPORARY for debugging
+// TODO: Remove this after verifying DB connection works
+app.get('/db/count', async (req, res) => {
+  try {
+    const { rows } = await db.query('SELECT COUNT(*)::int AS c FROM members');
+    res.json({ members: rows[0].c });
+  } catch (error) {
+    console.error('DB COUNT ERROR:', error);
+    res.status(500).json({
+      error: 'db_connect_failed',
+      message: error.message,
+      code: error.code
+    });
+  }
+});
+
 // Helper functions
 function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
