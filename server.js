@@ -106,16 +106,26 @@ function calculateMatchScore(member1, member2, similarity) {
 
   // Prevent self-matching
   if (member1.member_id === member2.member_id) {
-    return { score: 0, breakdown: [{ factor: 'Self-match', points: 0, description: 'Cannot match with yourself' }] };
+    return { score: 0, breakdown: [{ factor: 'Self-match', points: 0, maxPoints: 0, earned: 0, description: 'Cannot match with yourself' }], fullBreakdown: [] };
   }
 
-  // 1. Semantic similarity (0-40 points)
-  const semanticPoints = Math.round(similarity * 40);
-  breakdown.push({
+  // Track all scoring categories for full transparency
+  const fullBreakdown = [];
+
+  // 1. Semantic similarity (0-40 points) - ALWAYS show this
+  const maxSemanticPoints = 40;
+  const semanticPoints = Math.round(similarity * maxSemanticPoints);
+  const semanticCategory = {
     factor: 'Semantic Similarity',
     points: semanticPoints,
-    description: 'AI analysis of profile compatibility'
-  });
+    maxPoints: maxSemanticPoints,
+    earned: semanticPoints,
+    percentage: Math.round((semanticPoints / maxSemanticPoints) * 100),
+    description: 'AI analysis of profile compatibility based on embeddings',
+    status: semanticPoints > 25 ? 'strong' : semanticPoints > 15 ? 'moderate' : 'weak'
+  };
+  breakdown.push(semanticCategory);
+  fullBreakdown.push(semanticCategory);
   totalScore += semanticPoints;
 
   // Parse needs and assets
@@ -148,74 +158,132 @@ function calculateMatchScore(member1, member2, similarity) {
     }
   }
 
-  const complementaryPoints = Math.min(complementaryMatches * 6, 30);
-  if (complementaryPoints > 0) {
-    breakdown.push({
-      factor: 'Complementary Match',
-      points: complementaryPoints,
-      description: `${complementaryMatches} complementary need/asset pairs found`
-    });
-    totalScore += complementaryPoints;
-  }
+  const maxComplementaryPoints = 30;
+  const complementaryPoints = Math.min(complementaryMatches * 6, maxComplementaryPoints);
+  const complementaryCategory = {
+    factor: 'Complementary Assets/Needs',
+    points: complementaryPoints,
+    maxPoints: maxComplementaryPoints,
+    earned: complementaryPoints,
+    percentage: Math.round((complementaryPoints / maxComplementaryPoints) * 100),
+    description: complementaryPoints > 0
+      ? `${complementaryMatches} complementary need/asset pairs found`
+      : 'No direct asset/need overlap identified',
+    status: complementaryPoints > 18 ? 'strong' : complementaryPoints > 6 ? 'moderate' : 'none',
+    details: matches.slice(0, 3)
+  };
+  breakdown.push(complementaryCategory);
+  fullBreakdown.push(complementaryCategory);
+  totalScore += complementaryPoints;
 
-  // 3. Location match (0-15 points)
-  if (member1.city && member2.city && member1.city.toLowerCase() === member2.city.toLowerCase()) {
-    const locationPoints = 15;
-    breakdown.push({
-      factor: 'Same Location',
-      points: locationPoints,
-      description: `Both in ${member1.city} - easier to meet`
-    });
-    totalScore += locationPoints;
-  }
+  // 3. Location match (0-15 points) - ALWAYS show this
+  const maxLocationPoints = 15;
+  const sameLocation = member1.city && member2.city && member1.city.toLowerCase() === member2.city.toLowerCase();
+  const locationPoints = sameLocation ? maxLocationPoints : 0;
+  const locationCategory = {
+    factor: 'Geographic Proximity',
+    points: locationPoints,
+    maxPoints: maxLocationPoints,
+    earned: locationPoints,
+    percentage: Math.round((locationPoints / maxLocationPoints) * 100),
+    description: sameLocation
+      ? `Both in ${member1.city} - easier to meet in person`
+      : `Different locations: ${member1.city || 'Unknown'} vs ${member2.city || 'Unknown'}`,
+    status: locationPoints > 0 ? 'match' : 'different'
+  };
+  breakdown.push(locationCategory);
+  fullBreakdown.push(locationCategory);
+  totalScore += locationPoints;
 
-  // 4. Industry synergy (0-10 points)
+  // 4. Industry synergy (0-10 points) - ALWAYS show this
+  const maxIndustryPoints = 10;
+  let industryPoints = 0;
+  let industryDescription = '';
+  let industryStatus = 'unknown';
+
   if (member1.industry && member2.industry) {
     const ind1 = member1.industry.toLowerCase();
     const ind2 = member2.industry.toLowerCase();
     if (ind1 !== ind2) {
-      const industryPoints = 10;
-      breakdown.push({
-        factor: 'Cross-Industry Synergy',
-        points: industryPoints,
-        description: `${member1.industry} + ${member2.industry} = fresh perspectives`
-      });
-      totalScore += industryPoints;
+      industryPoints = maxIndustryPoints;
+      industryDescription = `${member1.industry} + ${member2.industry} = cross-industry insights`;
+      industryStatus = 'cross-industry';
     } else {
-      const industryPoints = 3;
-      breakdown.push({
-        factor: 'Same Industry',
-        points: industryPoints,
-        description: 'Shared industry knowledge and contacts'
-      });
-      totalScore += industryPoints;
+      industryPoints = 3;
+      industryDescription = `Both in ${member1.industry} - shared knowledge and contacts`;
+      industryStatus = 'same-industry';
     }
+  } else {
+    industryDescription = 'Industry information missing for comparison';
+    industryStatus = 'incomplete';
   }
 
-  // 5. Constraint alignment (0-5 points)
+  const industryCategory = {
+    factor: 'Industry Alignment',
+    points: industryPoints,
+    maxPoints: maxIndustryPoints,
+    earned: industryPoints,
+    percentage: Math.round((industryPoints / maxIndustryPoints) * 100),
+    description: industryDescription,
+    status: industryStatus
+  };
+  breakdown.push(industryCategory);
+  fullBreakdown.push(industryCategory);
+  totalScore += industryPoints;
+
+  // 5. Constraint alignment (0-5 points) - ALWAYS show this
+  const maxConstraintPoints = 5;
+  let constraintPoints = 0;
+  let constraintDescription = '';
+  let constraintStatus = 'none';
+
   if (member1.current_constraint && member2.assets) {
     const constraint1 = member1.current_constraint.toLowerCase();
     const hasAlignment = member2Assets.some(asset =>
       constraint1.includes(asset) || asset.includes(constraint1.split(' ')[0])
     );
     if (hasAlignment) {
-      const constraintPoints = 5;
-      breakdown.push({
-        factor: 'Constraint Relief',
-        points: constraintPoints,
-        description: 'They can help with your current challenge'
-      });
-      totalScore += constraintPoints;
+      constraintPoints = maxConstraintPoints;
+      constraintDescription = 'Their assets directly address your stated constraint';
+      constraintStatus = 'aligned';
+    } else {
+      constraintDescription = 'No direct asset match for your constraint';
+      constraintStatus = 'unmatched';
     }
+  } else {
+    constraintDescription = 'Constraint or asset information missing';
+    constraintStatus = 'incomplete';
   }
 
-  // Normalize to 100 points max
-  const normalizedScore = Math.min(totalScore, 100);
+  const constraintCategory = {
+    factor: 'Constraint Solution',
+    points: constraintPoints,
+    maxPoints: maxConstraintPoints,
+    earned: constraintPoints,
+    percentage: Math.round((constraintPoints / maxConstraintPoints) * 100),
+    description: constraintDescription,
+    status: constraintStatus
+  };
+  breakdown.push(constraintCategory);
+  fullBreakdown.push(constraintCategory);
+  totalScore += constraintPoints;
+
+  // Calculate summary statistics
+  const maxPossiblePoints = 100;
+  const normalizedScore = Math.min(totalScore, maxPossiblePoints);
+  const overallPercentage = Math.round((normalizedScore / maxPossiblePoints) * 100);
 
   return {
     score: normalizedScore,
-    breakdown,
-    matches: matches.slice(0, 3) // Top 3 specific matches
+    breakdown, // Concise version for quick display
+    fullBreakdown, // Complete transparency showing all categories
+    matches: matches.slice(0, 3), // Top 3 specific asset/need matches
+    summary: {
+      earned: normalizedScore,
+      possible: maxPossiblePoints,
+      percentage: overallPercentage,
+      grade: overallPercentage >= 70 ? 'A' : overallPercentage >= 50 ? 'B' : overallPercentage >= 30 ? 'C' : 'D'
+    }
   };
 }
 
@@ -374,10 +442,19 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       };
     });
 
+    // Log all scores for debugging
+    console.log(`📊 Calculated ${scored.length} match scores:`);
+    scored.forEach((s, i) => {
+      console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 points (${s.summary.grade} grade)`);
+      console.log(`      Breakdown: Semantic=${s.breakdown[0].points}/40, Complementary=${s.breakdown[1].points}/30, Location=${s.breakdown[2].points}/15, Industry=${s.breakdown[3].points}/10, Constraint=${s.breakdown[4].points}/5`);
+    });
+
     // Filter out self-matches and sort
     const filtered = scored.filter(s => s.score > 0);
     filtered.sort((a, b) => b.score - a.score);
     const top3 = filtered.slice(0, 3);
+
+    console.log(`✅ Selected top ${top3.length} matches (from ${filtered.length} candidates with score > 0)`);
 
     // Generate rationales for each match (with progress logging)
     console.log(`🤖 Generating AI intros for ${top3.length} matches...`);
@@ -396,12 +473,21 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
         }
 
         const introId = generateId('intro');
+
+        // Store both concise breakdown and full breakdown for complete transparency
+        const scoreData = {
+          score: match.score,
+          breakdown: match.breakdown, // Concise for display
+          fullBreakdown: match.fullBreakdown, // Complete objective matrix
+          summary: match.summary // Grade and percentage
+        };
+
         await db.run(`
           INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'top3', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'top3', match.score, JSON.stringify(scoreData), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
 
         console.log(`   ✅ Generated intro for ${match.name}`);
       } catch (error) {
@@ -495,12 +581,21 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
         }
 
         const introId = generateId('intro');
+
+        // Store both concise breakdown and full breakdown for complete transparency
+        const scoreData = {
+          score: match.score,
+          breakdown: match.breakdown, // Concise for display
+          fullBreakdown: match.fullBreakdown, // Complete objective matrix
+          summary: match.summary // Grade and percentage
+        };
+
         await db.run(`
           INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'brainstorm', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'brainstorm', match.score, JSON.stringify(scoreData), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
 
         console.log(`   ✅ Generated intro for ${match.name}`);
       } catch (error) {
