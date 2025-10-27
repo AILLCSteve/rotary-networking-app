@@ -248,8 +248,16 @@ async function generateEmbedding(memberId) {
   try {
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
 
-    // Build profile string for embedding
-    const profile = `${member.industry || ''} | ${member.rev_driver || ''} | ${member.current_constraint || ''} | assets: ${member.assets || ''} | needs: ${member.needs || ''} | ${member.city || ''}`;
+    // Build RICH profile string for embedding - include everything for better semantic matching
+    const profile = `
+      ${member.name} | ${member.role} at ${member.org}
+      Industry: ${member.industry || ''} | Location: ${member.city || ''}
+      Revenue Model: ${member.rev_driver || ''}
+      Current Challenge: ${member.current_constraint || ''}
+      What I Bring: ${member.assets || ''}
+      What I Need: ${member.needs || ''}
+      About Me: ${member.fun_fact || ''}
+    `.trim();
 
     // Generate embedding using OpenAI
     const response = await openai.embeddings.create({
@@ -266,6 +274,7 @@ async function generateEmbedding(memberId) {
       ON CONFLICT (member_id) DO UPDATE SET embedding_ops = $2
     `, [memberId, JSON.stringify(embedding)]);
 
+    console.log(`✅ Embedding generated for ${member.name} (${member.org})`);
   } catch (error) {
     console.error('Embedding generation error:', error);
   }
@@ -457,41 +466,94 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
 // Generate match rationale using OpenAI with advanced prompt engineering and web research
 async function generateMatchRationale(member1, member2, useGPT4 = false) {
   try {
-    // Build dynamic industry-specific expert persona
-    const industries = [member1.industry, member2.industry].filter(Boolean);
-    const industryExpertise = industries.length > 0
-      ? `You possess deep expertise in ${industries.join(' and ')}, having consulted for Fortune 500 companies and startups alike in these sectors.`
-      : 'You have cross-industry expertise spanning technology, services, healthcare, finance, and more.';
+    // Build RICH industry-specific expert persona with strategic context
+    const industries = [member1.industry, member2.industry].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i); // unique
+
+    // Industry-specific language patterns and success metrics
+    const getIndustryContext = (industry) => {
+      const contexts = {
+        'Technology': 'You understand CAC, LTV, ARR, churn metrics, product-market fit, and tech stack decisions.',
+        'Digital Marketing': 'You speak fluently about CTR, ROAS, conversion funnels, attribution models, and content strategy.',
+        'Real Estate': 'You know cap rates, NOI, market cycles, zoning, and the importance of location-based networks.',
+        'Finance': 'You understand deal structuring, due diligence, portfolio diversification, and risk mitigation.',
+        'E-commerce': 'You know inventory turnover, AOV, conversion optimization, logistics, and marketplace dynamics.',
+        'Legal Services': 'You understand billable hours, retainer models, case law, regulatory compliance, and client acquisition.',
+        'Food & Hospitality': 'You know food cost percentages, table turns, labor management, and the power of local reputation.',
+        'Beauty': 'You understand customer retention, service-based revenue, product lines, and franchise economics.',
+        'Online Education': 'You know course completion rates, student lifetime value, community engagement, and scalable learning platforms.',
+        'Consulting': 'You understand value-based pricing, thought leadership, referral networks, and outcome-driven engagements.',
+        'Media': 'You know audience metrics, content distribution, monetization models, and platform algorithms.'
+      };
+      return contexts[industry] || `You understand ${industry} business models, key metrics, and growth drivers.`;
+    };
+
+    const industryContexts = industries.map(ind => getIndustryContext(ind)).join(' ');
+    const crossIndustryNote = industries.length > 1
+      ? `\n\n🔥 CROSS-INDUSTRY ADVANTAGE: You recognize that ${member1.industry}-to-${member2.industry} connections often create breakthrough opportunities because each brings blind spots the other can illuminate.`
+      : '';
+
+    // Role/seniority awareness for appropriate tone
+    const roleContext = (member1.role && member2.role)
+      ? `\nCONTEXT: ${member1.role} meeting ${member2.role} - calibrate your tone to match peer, mentor, or partnership dynamics appropriately.`
+      : '';
 
     const systemPrompt = `You are a composite expert persona combining:
-1. **Master Business Networking Strategist** - 20+ years connecting executives and entrepreneurs
-2. **${member1.industry || 'Business'} Industry Expert** - Deep knowledge of ${member1.org}'s sector
-3. **${member2.industry || 'Business'} Industry Specialist** - Intimate understanding of ${member2.org}'s market
-4. **Market Intelligence Analyst** - Access to recent news, trends, and company developments
+1. **Master Business Networking Strategist** - 20+ years connecting executives and entrepreneurs at Rotary, YPO, and Vistage
+2. **${member1.industry || 'Business'} Industry Expert** - Deep operational knowledge of how ${member1.org} type businesses succeed
+3. **${member2.industry || 'Business'} Industry Specialist** - Intimate understanding of ${member2.org}'s market dynamics
+4. **Market Intelligence Analyst** - Equipped with recent news, trends, and company developments
 
-${industryExpertise}
+${industryContexts}${crossIndustryNote}${roleContext}
 
-YOUR MISSION: Create a personalized, research-backed networking introduction that speaks directly to ${member1.name} about why connecting with ${member2.name} from ${member2.org} will drive tangible business value.
+YOUR MISSION: Create a personalized, research-backed networking introduction that speaks directly to ${member1.name} about why connecting with ${member2.name} from ${member2.org} will drive TANGIBLE BUSINESS VALUE.
 
 CRITICAL VOICE & TONE REQUIREMENTS:
-- Speak TO ${member1.name} in second person ("you", "your business")
-- Speak ABOUT ${member2.name} in third person ("they", "their company", "${member2.name}")
-- Be conversational yet professional
-- Show genuine enthusiasm for the connection potential
-- Reference specific, concrete details from their profiles
+- Speak TO ${member1.name} in second person ("you", "your business", "your team")
+- Speak ABOUT ${member2.name} in third person ("they", "their company", "${member2.name}", "${member2.org}")
+- Be conversational yet professional - like a trusted advisor over coffee
+- Show genuine enthusiasm backed by concrete reasoning
+- Reference SPECIFIC details from profiles - names, numbers, achievements
 
-RESEARCH EXPECTATIONS:
-- If you have knowledge of ${member1.org}, ${member2.org}, or the individuals, USE IT
-- Reference any known recent activities, news, achievements, or market positioning
-- Incorporate industry trends relevant to both parties
-- Draw on knowledge of similar successful partnerships in these industries
+🔍 REQUIRED RESEARCH - Access Your Full Knowledge Base:
+**STEP 1: Research Both Parties**
+- Search your knowledge for ANY information about ${member1.name}, ${member1.org}, ${member2.name}, ${member2.org}
+- Look for: recent news, product launches, funding rounds, social media presence, interviews, articles, awards
+- If they're public figures or well-known companies, USE THAT KNOWLEDGE
+- Check for any mentions in industry publications, podcasts, or thought leadership
 
-ANALYSIS FRAMEWORK:
-1. **Constraint-Solution Mapping**: How does ${member2.name}'s expertise solve ${member1.name}'s stated constraint?
-2. **Complementary Value Exchange**: What specific assets/needs align between them?
-3. **Revenue Multiplication**: How could this partnership create 1+1=3 opportunities?
-4. **Relationship Catalysts**: What makes THIS introduction timely and relevant NOW?
-5. **Trust Builders**: What credentials/achievements make ${member2.name} credible?`;
+**STEP 2: Industry Context Research**
+- What are the TOP 3 trends in ${member1.industry} RIGHT NOW?
+- What are the TOP 3 trends in ${member2.industry} RIGHT NOW?
+- How do these trends create urgency or opportunity for this connection?
+- What successful ${member1.industry}-to-${member2.industry} partnerships exist as precedents?
+
+**STEP 3: Social Proof & Credibility**
+- If fun facts mention achievements (TV shows, acquisitions, growth numbers), validate and amplify them
+- Reference any known reputation, market position, or industry standing
+- Look for mutual connections, shared experiences, or parallel career paths
+
+🎯 DUAL-MODE ANALYSIS FRAMEWORK - Think Both Logically AND Creatively:
+
+**MODE A: DIRECT CORRELATIONS** (Obvious, Immediate Matches)
+1. **Explicit Constraint-Solution Fit**: Does ${member2.name}'s stated assets DIRECTLY address ${member1.name}'s stated constraint?
+2. **Asset-Need Symmetry**: Do their listed capabilities align 1:1 (e.g., "SEO services" matches "need SEO")?
+3. **Geographic Advantage**: Same city = easy meetings, similar market conditions
+4. **Industry Parallels**: Same challenges, shared language, common customer types
+
+**MODE B: CREATIVE CORRELATIONS** (Non-Obvious, Strategic Synergies)
+5. **Adjacent Problem Solving**: Could ${member2.name}'s expertise solve a constraint ${member1.name} HASN'T articulated but likely has?
+   - Example: Marketing constraint might actually need better product positioning (strategic angle)
+6. **Latent Asset Activation**: What does ${member1.name} have that they might not realize is valuable to ${member2.name}?
+   - Example: Tech company's "audience data" could be goldmine for marketer's "campaign targeting"
+7. **Cross-Pollination Opportunities**: How could each learn from the other's industry playbook?
+   - Example: E-commerce conversion tactics applied to SaaS trial-to-paid funnels
+8. **Network Effect Multiplication**: Who do they each know that could create a 3-way value triangle?
+   - Example: Realtor's investor network + tech founder's product = PropTech partnership
+9. **Timing-Based Serendipity**: Based on growth stage, recent achievements, or market shifts, why is NOW the perfect time?
+10. **Unexpected Commonalities**: Do fun facts, backgrounds, or experiences reveal surprising shared ground?
+    - Example: Both started businesses in garages, both pivoted from different careers, both mentor entrepreneurs
+
+💡 **CRITICAL**: Your analysis MUST include BOTH direct AND creative connections. Show the obvious value AND the non-obvious strategic potential.`;
 
     const userPrompt = `You're preparing ${member1.name} for a high-value networking introduction. Analyze this match and create a compelling briefing:
 
@@ -514,7 +576,8 @@ Based in: ${member1.city}
 🔍 What You're Seeking:
    ${member1.needs || 'Not disclosed'}
 
-✨ Notable Context: ${member1.fun_fact || 'Not disclosed'}
+🌟 MEMORABLE CONTEXT (Great conversation starter!):
+   ${member1.fun_fact || 'Not disclosed'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 WHO THEY ARE (Your Potential Match)
@@ -536,44 +599,59 @@ Based in: ${member2.city}
 🔍 What They're Seeking:
    ${member2.needs || 'Not disclosed'}
 
-✨ Notable Context: ${member2.fun_fact || 'Not disclosed'}
+🌟 MEMORABLE CONTEXT (Use this as an icebreaker!):
+   ${member2.fun_fact || 'Not disclosed'}
+
+💡 PRO TIP: Fun facts are GOLD for opening conversations. If either person has an impressive or unusual story, USE IT in Approach #3!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **🎯 YOUR TASK:**
 
-Generate THREE components addressing ${member1.name} directly:
+First, RESEARCH both parties using your knowledge base (companies, people, industries, trends). Then generate THREE components addressing ${member1.name} directly:
 
-**1. STRATEGIC RATIONALE** (3-4 sentences speaking directly to ${member1.name})
+**1. STRATEGIC RATIONALE** (3-5 sentences speaking directly to ${member1.name})
 - Start with "You should connect with ${member2.name} because..."
-- Explain the SPECIFIC business value this connection offers YOU
-- Reference YOUR stated constraint and how THEY can help
-- Cite any relevant industry knowledge, company news, or market context
-- Quantify potential impact where possible
+- CITE RESEARCH: Reference any news, articles, achievements, social media presence, or industry reputation you know
+- Address DIRECT correlation: How do their assets explicitly solve your stated constraint?
+- Address CREATIVE correlation: What non-obvious synergies exist (latent assets, cross-pollination, network effects)?
+- Reference current industry trends making this connection timely
+- Quantify potential impact where possible (revenue, growth, market access)
 
 **2. UNIQUE COLLABORATION ANGLE** (2-3 sentences to ${member1.name})
-- Present a creative, unexpected way you could work with ${member2.org}
-- Go beyond obvious transactional exchanges
-- Reference specific assets, backgrounds, or achievements
-- Make it memorable and intriguing
+- Present a CREATIVE, non-obvious way you could work with ${member2.org}
+- This should go beyond simple transactional exchanges (not just "hire them")
+- Consider: joint ventures, co-marketing, knowledge sharing, network introductions, complementary offerings
+- Reference specific assets, backgrounds, fun facts, or achievements
+- Make it memorable and intriguing - something they haven't thought of yet
 
 **3. THREE CONVERSATION APPROACHES** (Write in second-person, giving ${member1.name} options)
-Format as a numbered list, each approach being 2-3 sentences:
+Format as a numbered list, each approach being 2-3 sentences with SPECIFIC details:
 
-Approach #1: [The Direct Value Pitch]
-"You could open with... [specific conversation starter mentioning their constraint/need]..."
+Approach #1: [The Direct Value Pitch - Based on DIRECT Correlation]
+"You could open with... [specific conversation starter mentioning their stated constraint and how the match's stated assets solve it directly]..."
 
-Approach #2: [The Collaborative Exploration]
-"You could take a partnership angle by... [specific collaboration idea]..."
+Approach #2: [The Creative Collaboration - Based on CREATIVE Correlation]
+"You could take a strategic partnership angle by... [non-obvious opportunity - cross-pollination, latent assets, network effects, adjacent problem solving]..."
 
-Approach #3: [The Personal Connection]
-"You could build rapport by... [reference to fun facts, shared background, or achievements]..."
+Approach #3: [The Personal Connection / Icebreaker - Based on RESEARCH & Fun Facts]
+"You could build instant rapport by... [MUST reference fun facts, impressive achievements from their background, or any research findings like awards/media/known achievements]..."
 
-**IMPORTANT**:
+**CRITICAL REQUIREMENTS**:
 - Use "you/your" when addressing ${member1.name}
 - Use "they/their/${member2.name}/${member2.org}" when referring to the match
-- Be specific - mention actual company names, roles, assets, constraints
-- If you have ANY knowledge of these companies or individuals, reference it!
+- Be SPECIFIC - mention actual company names, roles, assets, constraints, and especially FUN FACTS
+- Approach #3 MUST incorporate fun facts as conversation starters if they're interesting
+- If fun facts mention impressive achievements (like "built $100M company" or "won awards"), treat them as major credibility builders
+- If you have ANY knowledge of these companies, individuals, or their achievements, reference it!
+- Make it feel like insider intelligence, not generic networking advice
+
+**VOICE EXAMPLES**:
+✅ GOOD: "You could open by mentioning their impressive track record turning around 100+ businesses on The Profit..."
+❌ BAD: "They have experience in business consulting..."
+
+✅ GOOD: "Given your constraint around marketing reach, their proven expertise scaling brands from $3M to $60M using YouTube is exactly what you need..."
+❌ BAD: "They can help with your marketing needs..."
 
 Return as JSON with keys: rationale_ops, creative_angle, intro_basis`;
 
