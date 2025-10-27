@@ -149,8 +149,8 @@ app.get('/api/debug/matches/:memberId', async (req, res) => {
           similarity: similarity.toFixed(4),
           fullBreakdown: scoreData.fullBreakdown,
           summary: scoreData.summary,
-          passesTop3Filter: scoreData.score > 0,
-          passesBrainstormFilter: scoreData.score >= 40
+          isValidMatch: scoreData.score > 0, // Only excludes self-matches (score = 0)
+          qualityTier: scoreData.score >= 75 ? 'excellent' : scoreData.score >= 60 ? 'strong' : scoreData.score >= 50 ? 'good' : scoreData.score >= 40 ? 'moderate' : 'baseline'
         };
       } catch (error) {
         return {
@@ -169,14 +169,20 @@ app.get('/api/debug/matches/:memberId', async (req, res) => {
     debugInfo.candidates = scored;
     debugInfo.summary = {
       totalCandidates: scored.length,
-      withScore: scored.filter(s => s.score > 0).length,
-      top3Eligible: scored.filter(s => s.score > 0).length,
-      brainstormEligible: scored.filter(s => s.score >= 40).length,
+      validMatches: scored.filter(s => s.score > 0).length,
       averageScore: (scored.reduce((sum, s) => sum + s.score, 0) / scored.length).toFixed(2),
-      averageSimilarity: (scored.reduce((sum, s) => sum + parseFloat(s.similarity || 0), 0) / scored.length).toFixed(4)
+      averageSimilarity: (scored.reduce((sum, s) => sum + parseFloat(s.similarity || 0), 0) / scored.length).toFixed(4),
+      scoreDistribution: {
+        excellent: scored.filter(s => s.score >= 75).length,
+        strong: scored.filter(s => s.score >= 60 && s.score < 75).length,
+        good: scored.filter(s => s.score >= 50 && s.score < 60).length,
+        moderate: scored.filter(s => s.score >= 40 && s.score < 50).length,
+        baseline: scored.filter(s => s.score >= 30 && s.score < 40).length
+      },
+      philosophy: 'NO FILTERING - All valid matches included (every business professional has networking potential)'
     };
 
-    console.log(`🐛 Summary: ${debugInfo.summary.top3Eligible} eligible for top3, ${debugInfo.summary.brainstormEligible} for brainstorm`);
+    console.log(`🐛 Summary: ${debugInfo.summary.validMatches} valid matches (no filtering - all included)`);
 
     res.json(debugInfo);
   } catch (error) {
@@ -209,41 +215,69 @@ function cosineSimilarity(vec1, vec2) {
 }
 
 // Calculate match score with detailed breakdown (100-point system)
+// PHILOSOPHY: Every business professional has networking potential - score reflects quality/synergy depth
 function calculateMatchScore(member1, member2, similarity) {
   const breakdown = [];
+  const fullBreakdown = [];
   let totalScore = 0;
 
   // Prevent self-matching
   if (member1.member_id === member2.member_id) {
-    return { score: 0, breakdown: [{ factor: 'Self-match', points: 0, maxPoints: 0, earned: 0, description: 'Cannot match with yourself' }], fullBreakdown: [] };
+    return { score: 0, breakdown: [], fullBreakdown: [], summary: { earned: 0, possible: 100, percentage: 0, grade: 'N/A' } };
   }
 
-  // Track all scoring categories for full transparency
-  const fullBreakdown = [];
+  // ============================================================================
+  // 1. UNIVERSAL BUSINESS POTENTIAL (30 points BASELINE)
+  // ============================================================================
+  // Every attendee gets this - represents fundamental networking value
+  const universalPoints = 30;
+  const universalCategory = {
+    factor: 'Universal Business Potential',
+    points: universalPoints,
+    maxPoints: 30,
+    earned: universalPoints,
+    percentage: 100,
+    description: 'All business professionals share common ground: revenue growth goals, operational challenges, desire to network and learn',
+    status: 'baseline',
+    reasoning: [
+      'Both are entrepreneurs/business leaders seeking growth',
+      'Shared experience navigating business challenges',
+      'Mutual interest in expanding professional network',
+      'Universal business needs: customers, capital, talent, efficiency'
+    ]
+  };
+  breakdown.push(universalCategory);
+  fullBreakdown.push(universalCategory);
+  totalScore += universalPoints;
 
-  // 1. Semantic similarity (0-40 points) - ALWAYS show this
-  const maxSemanticPoints = 40;
+  // ============================================================================
+  // 2. SEMANTIC PROFILE SIMILARITY (0-20 points)
+  // ============================================================================
+  const maxSemanticPoints = 20;
   const semanticPoints = Math.round(similarity * maxSemanticPoints);
   const semanticCategory = {
-    factor: 'Semantic Similarity',
+    factor: 'Semantic Profile Similarity',
     points: semanticPoints,
     maxPoints: maxSemanticPoints,
     earned: semanticPoints,
     percentage: Math.round((semanticPoints / maxSemanticPoints) * 100),
-    description: 'AI analysis of profile compatibility based on embeddings',
-    status: semanticPoints > 25 ? 'strong' : semanticPoints > 15 ? 'moderate' : 'weak'
+    description: 'AI embedding analysis of overall profile compatibility',
+    status: semanticPoints > 14 ? 'strong' : semanticPoints > 8 ? 'moderate' : 'complementary',
+    rawSimilarity: similarity.toFixed(4)
   };
   breakdown.push(semanticCategory);
   fullBreakdown.push(semanticCategory);
   totalScore += semanticPoints;
 
-  // Parse needs and assets
+  // Parse needs and assets for multiple categories
   const member1Needs = member1.needs ? member1.needs.split(',').map(n => n.trim().toLowerCase()) : [];
   const member1Assets = member1.assets ? member1.assets.split(',').map(a => a.trim().toLowerCase()) : [];
   const member2Needs = member2.needs ? member2.needs.split(',').map(n => n.trim().toLowerCase()) : [];
   const member2Assets = member2.assets ? member2.assets.split(',').map(a => a.trim().toLowerCase()) : [];
 
-  // 2. Complementary needs/assets (0-30 points)
+  // ============================================================================
+  // 3. COMPLEMENTARY VALUE EXCHANGE (0-20 points)
+  // ============================================================================
   let complementaryMatches = 0;
   const matches = [];
 
@@ -252,7 +286,7 @@ function calculateMatchScore(member1, member2, similarity) {
     for (const need of member2Needs) {
       if (asset.includes(need) || need.includes(asset)) {
         complementaryMatches++;
-        matches.push(`Your "${asset}" helps their need for "${need}"`);
+        matches.push(`Your "${asset}" addresses their need for "${need}"`);
       }
     }
   }
@@ -262,136 +296,192 @@ function calculateMatchScore(member1, member2, similarity) {
     for (const need of member1Needs) {
       if (asset.includes(need) || need.includes(asset)) {
         complementaryMatches++;
-        matches.push(`Their "${asset}" helps your need for "${need}"`);
+        matches.push(`Their "${asset}" addresses your need for "${need}"`);
       }
     }
   }
 
-  const maxComplementaryPoints = 30;
-  const complementaryPoints = Math.min(complementaryMatches * 6, maxComplementaryPoints);
+  const maxComplementaryPoints = 20;
+  const complementaryPoints = Math.min(complementaryMatches * 5, maxComplementaryPoints);
   const complementaryCategory = {
-    factor: 'Complementary Assets/Needs',
+    factor: 'Complementary Value Exchange',
     points: complementaryPoints,
     maxPoints: maxComplementaryPoints,
     earned: complementaryPoints,
     percentage: Math.round((complementaryPoints / maxComplementaryPoints) * 100),
     description: complementaryPoints > 0
-      ? `${complementaryMatches} complementary need/asset pairs found`
-      : 'No direct asset/need overlap identified',
-    status: complementaryPoints > 18 ? 'strong' : complementaryPoints > 6 ? 'moderate' : 'none',
+      ? `${complementaryMatches} direct asset/need alignment${complementaryMatches > 1 ? 's' : ''} identified`
+      : 'Potential for creative collaboration beyond explicit needs/assets',
+    status: complementaryPoints > 12 ? 'strong' : complementaryPoints > 4 ? 'moderate' : 'exploratory',
     details: matches.slice(0, 3)
   };
   breakdown.push(complementaryCategory);
   fullBreakdown.push(complementaryCategory);
   totalScore += complementaryPoints;
 
-  // 3. Location match (0-15 points) - ALWAYS show this
-  const maxLocationPoints = 15;
-  const sameLocation = member1.city && member2.city && member1.city.toLowerCase() === member2.city.toLowerCase();
-  const locationPoints = sameLocation ? maxLocationPoints : 0;
+  // ============================================================================
+  // 4. MARKET ALIGNMENT (0-15 points) - INFERRED BUSINESS INTELLIGENCE
+  // ============================================================================
+  let marketPoints = 0;
+  const marketInsights = [];
+
+  // Infer B2B vs B2C from revenue driver
+  const rev1 = (member1.rev_driver || '').toLowerCase();
+  const rev2 = (member2.rev_driver || '').toLowerCase();
+  const isB2B1 = rev1.includes('b2b') || rev1.includes('enterprise') || rev1.includes('saas') || rev1.includes('consulting') || rev1.includes('agency');
+  const isB2B2 = rev2.includes('b2b') || rev2.includes('enterprise') || rev2.includes('saas') || rev2.includes('consulting') || rev2.includes('agency');
+  const isB2C1 = rev1.includes('retail') || rev1.includes('consumer') || rev1.includes('ecommerce') || rev1.includes('subscription');
+  const isB2C2 = rev2.includes('retail') || rev2.includes('consumer') || rev2.includes('ecommerce') || rev2.includes('subscription');
+
+  if ((isB2B1 && isB2B2) || (isB2C1 && isB2C2)) {
+    marketPoints += 5;
+    marketInsights.push('Similar business model (both B2B or both B2C)');
+  } else if ((isB2B1 && isB2C2) || (isB2C1 && isB2B2)) {
+    marketPoints += 3;
+    marketInsights.push('Complementary business models - can learn from each other');
+  }
+
+  // Infer business maturity/scale from role + fun facts
+  const role1 = (member1.role || '').toLowerCase();
+  const role2 = (member2.role || '').toLowerCase();
+  const funfact1 = (member1.fun_fact || '').toLowerCase();
+  const funfact2 = (member2.fun_fact || '').toLowerCase();
+
+  const isFounder1 = role1.includes('founder') || role1.includes('ceo') || role1.includes('owner');
+  const isFounder2 = role2.includes('founder') || role2.includes('ceo') || role2.includes('owner');
+  const isEstablished1 = funfact1.match(/\$\d+[mk]|\d+ year|million|billion|national|awarded/i);
+  const isEstablished2 = funfact2.match(/\$\d+[mk]|\d+ year|million|billion|national|awarded/i);
+
+  if (isFounder1 && isFounder2) {
+    marketPoints += 5;
+    marketInsights.push('Both founders/CEOs - shared leadership perspective');
+  }
+
+  if (isEstablished1 && isEstablished2) {
+    marketPoints += 3;
+    marketInsights.push('Both have proven track records of success');
+  } else if ((isEstablished1 && !isEstablished2) || (!isEstablished1 && isEstablished2)) {
+    marketPoints += 2;
+    marketInsights.push('Mentorship opportunity - different growth stages');
+  }
+
+  // Infer revenue growth mindset (everyone in business wants to grow)
+  if (member1.current_constraint && member2.current_constraint) {
+    marketPoints += 2;
+    marketInsights.push('Both actively working to overcome growth constraints');
+  }
+
+  const maxMarketPoints = 15;
+  marketPoints = Math.min(marketPoints, maxMarketPoints);
+  const marketCategory = {
+    factor: 'Market Alignment',
+    points: marketPoints,
+    maxPoints: maxMarketPoints,
+    earned: marketPoints,
+    percentage: Math.round((marketPoints / maxMarketPoints) * 100),
+    description: 'Inferred compatibility based on business model, scale, and growth stage',
+    status: marketPoints > 10 ? 'strong' : marketPoints > 5 ? 'moderate' : 'foundational',
+    insights: marketInsights
+  };
+  breakdown.push(marketCategory);
+  fullBreakdown.push(marketCategory);
+  totalScore += marketPoints;
+
+  // ============================================================================
+  // 5. GEOGRAPHIC & LOGISTICAL SYNERGY (0-10 points)
+  // ============================================================================
+  const maxLocationPoints = 10;
+  let locationPoints = 0;
+  let locationDescription = '';
+
+  const city1 = (member1.city || '').toLowerCase().trim();
+  const city2 = (member2.city || '').toLowerCase().trim();
+
+  if (city1 && city2) {
+    if (city1 === city2) {
+      locationPoints = maxLocationPoints;
+      locationDescription = `Both based in ${member1.city} - excellent for in-person collaboration`;
+    } else {
+      // Different cities still have value (remote collaboration is normal)
+      locationPoints = 3;
+      locationDescription = `Different cities (${member1.city} / ${member2.city}) - remote collaboration opportunities`;
+    }
+  } else {
+    locationPoints = 2;
+    locationDescription = 'Location flexibility - modern business transcends geography';
+  }
+
   const locationCategory = {
-    factor: 'Geographic Proximity',
+    factor: 'Geographic & Logistical Synergy',
     points: locationPoints,
     maxPoints: maxLocationPoints,
     earned: locationPoints,
     percentage: Math.round((locationPoints / maxLocationPoints) * 100),
-    description: sameLocation
-      ? `Both in ${member1.city} - easier to meet in person`
-      : `Different locations: ${member1.city || 'Unknown'} vs ${member2.city || 'Unknown'}`,
-    status: locationPoints > 0 ? 'match' : 'different'
+    description: locationDescription,
+    status: locationPoints >= 10 ? 'local' : locationPoints >= 3 ? 'remote-friendly' : 'flexible'
   };
   breakdown.push(locationCategory);
   fullBreakdown.push(locationCategory);
   totalScore += locationPoints;
 
-  // 4. Industry synergy (0-10 points) - ALWAYS show this
-  const maxIndustryPoints = 10;
-  let industryPoints = 0;
-  let industryDescription = '';
-  let industryStatus = 'unknown';
+  // ============================================================================
+  // 6. STRATEGIC GROWTH OPPORTUNITIES (0-5 points)
+  // ============================================================================
+  let strategyPoints = 0;
+  const strategyInsights = [];
 
-  if (member1.industry && member2.industry) {
-    const ind1 = member1.industry.toLowerCase();
-    const ind2 = member2.industry.toLowerCase();
-    if (ind1 !== ind2) {
-      industryPoints = maxIndustryPoints;
-      industryDescription = `${member1.industry} + ${member2.industry} = cross-industry insights`;
-      industryStatus = 'cross-industry';
-    } else {
-      industryPoints = 3;
-      industryDescription = `Both in ${member1.industry} - shared knowledge and contacts`;
-      industryStatus = 'same-industry';
-    }
-  } else {
-    industryDescription = 'Industry information missing for comparison';
-    industryStatus = 'incomplete';
+  // Industry cross-pollination
+  const ind1 = (member1.industry || '').toLowerCase();
+  const ind2 = (member2.industry || '').toLowerCase();
+
+  if (ind1 && ind2 && ind1 !== ind2) {
+    strategyPoints += 3;
+    strategyInsights.push(`Cross-industry innovation: ${member1.industry} × ${member2.industry}`);
+  } else if (ind1 && ind2 && ind1 === ind2) {
+    strategyPoints += 2;
+    strategyInsights.push(`Shared industry expertise in ${member1.industry}`);
   }
 
-  const industryCategory = {
-    factor: 'Industry Alignment',
-    points: industryPoints,
-    maxPoints: maxIndustryPoints,
-    earned: industryPoints,
-    percentage: Math.round((industryPoints / maxIndustryPoints) * 100),
-    description: industryDescription,
-    status: industryStatus
-  };
-  breakdown.push(industryCategory);
-  fullBreakdown.push(industryCategory);
-  totalScore += industryPoints;
-
-  // 5. Constraint alignment (0-5 points) - ALWAYS show this
-  const maxConstraintPoints = 5;
-  let constraintPoints = 0;
-  let constraintDescription = '';
-  let constraintStatus = 'none';
-
-  if (member1.current_constraint && member2.assets) {
-    const constraint1 = member1.current_constraint.toLowerCase();
-    const hasAlignment = member2Assets.some(asset =>
-      constraint1.includes(asset) || asset.includes(constraint1.split(' ')[0])
-    );
-    if (hasAlignment) {
-      constraintPoints = maxConstraintPoints;
-      constraintDescription = 'Their assets directly address your stated constraint';
-      constraintStatus = 'aligned';
-    } else {
-      constraintDescription = 'No direct asset match for your constraint';
-      constraintStatus = 'unmatched';
-    }
-  } else {
-    constraintDescription = 'Constraint or asset information missing';
-    constraintStatus = 'incomplete';
+  // Constraint as opportunity indicator
+  if ((member1.current_constraint && member2Assets.length > 0) ||
+      (member2.current_constraint && member1Assets.length > 0)) {
+    strategyPoints += 2;
+    strategyInsights.push('Potential constraint-solution partnerships');
   }
 
-  const constraintCategory = {
-    factor: 'Constraint Solution',
-    points: constraintPoints,
-    maxPoints: maxConstraintPoints,
-    earned: constraintPoints,
-    percentage: Math.round((constraintPoints / maxConstraintPoints) * 100),
-    description: constraintDescription,
-    status: constraintStatus
+  const maxStrategyPoints = 5;
+  strategyPoints = Math.min(strategyPoints, maxStrategyPoints);
+  const strategyCategory = {
+    factor: 'Strategic Growth Opportunities',
+    points: strategyPoints,
+    maxPoints: maxStrategyPoints,
+    earned: strategyPoints,
+    percentage: Math.round((strategyPoints / maxStrategyPoints) * 100),
+    description: 'Long-term strategic value and growth potential',
+    status: strategyPoints >= 4 ? 'high-value' : strategyPoints >= 2 ? 'valuable' : 'exploratory',
+    insights: strategyInsights
   };
-  breakdown.push(constraintCategory);
-  fullBreakdown.push(constraintCategory);
-  totalScore += constraintPoints;
+  breakdown.push(strategyCategory);
+  fullBreakdown.push(strategyCategory);
+  totalScore += strategyPoints;
 
-  // Calculate summary statistics
+  // ============================================================================
+  // FINAL SCORE CALCULATION
+  // ============================================================================
   const maxPossiblePoints = 100;
   const normalizedScore = Math.min(totalScore, maxPossiblePoints);
   const overallPercentage = Math.round((normalizedScore / maxPossiblePoints) * 100);
 
   return {
     score: normalizedScore,
-    breakdown, // Concise version for quick display
-    fullBreakdown, // Complete transparency showing all categories
-    matches: matches.slice(0, 3), // Top 3 specific asset/need matches
+    breakdown, // Concise version
+    fullBreakdown, // Complete transparency
+    matches: matches.slice(0, 3), // Top specific asset/need matches
     summary: {
       earned: normalizedScore,
       possible: maxPossiblePoints,
       percentage: overallPercentage,
-      grade: overallPercentage >= 70 ? 'A' : overallPercentage >= 50 ? 'B' : overallPercentage >= 30 ? 'C' : 'D'
+      grade: overallPercentage >= 85 ? 'A+' : overallPercentage >= 75 ? 'A' : overallPercentage >= 65 ? 'B+' : overallPercentage >= 55 ? 'B' : 'C+'
     }
   };
 }
@@ -576,18 +666,19 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     const top3 = filtered.slice(0, 3);
 
     // Log filtered scores for debugging (safe - already filtered)
-    console.log(`📊 Calculated ${scored.length} candidates, ${filtered.length} with score > 0:`);
+    console.log(`📊 Calculated ${scored.length} candidates, ${filtered.length} valid matches:`);
     try {
       filtered.slice(0, 10).forEach((s, i) => {
         const grade = s.summary?.grade || '?';
-        const semantic = s.breakdown?.[0]?.points || 0;
-        const complementary = s.breakdown?.[1]?.points || 0;
-        const location = s.breakdown?.[2]?.points || 0;
-        const industry = s.breakdown?.[3]?.points || 0;
-        const constraint = s.breakdown?.[4]?.points || 0;
+        const universal = s.breakdown?.[0]?.points || 0;
+        const semantic = s.breakdown?.[1]?.points || 0;
+        const complementary = s.breakdown?.[2]?.points || 0;
+        const market = s.breakdown?.[3]?.points || 0;
+        const location = s.breakdown?.[4]?.points || 0;
+        const strategy = s.breakdown?.[5]?.points || 0;
 
         console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 (${grade})`);
-        console.log(`      → ${semantic}/40 semantic, ${complementary}/30 complementary, ${location}/15 location, ${industry}/10 industry, ${constraint}/5 constraint`);
+        console.log(`      → ${universal}/30 baseline, ${semantic}/20 semantic, ${complementary}/20 complementary, ${market}/15 market, ${location}/10 location, ${strategy}/5 strategy`);
       });
     } catch (logError) {
       console.error('⚠️  Logging error (non-critical):', logError.message);
@@ -715,23 +806,24 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     });
     console.log(`✅ Scoring complete`);
 
-    // Filter by threshold and sort (exclude self-matches)
-    const threshold = 20; // Minimum score threshold (lowered from 40 - was filtering out too many!)
-    const filtered = scored.filter(c => c.score >= threshold);
+    // Filter only to exclude self-matches (score = 0), then sort by score
+    // NO THRESHOLD - every business professional has networking potential
+    const filtered = scored.filter(c => c.score > 0); // Only removes self-matches and errors
     filtered.sort((a, b) => b.score - a.score);
-    const brainstorm = filtered.slice(0, 20); // Limit to 20 for quality AI generation
+    const brainstorm = filtered; // Return ALL matches for comprehensive brainstorming
 
-    // Log score distribution to understand what's happening
+    // Log score distribution to understand quality range
     const scoreRanges = {
-      excellent: scored.filter(s => s.score >= 70).length,
-      good: scored.filter(s => s.score >= 50 && s.score < 70).length,
-      fair: scored.filter(s => s.score >= 30 && s.score < 50).length,
-      weak: scored.filter(s => s.score >= 20 && s.score < 30).length,
-      veryWeak: scored.filter(s => s.score > 0 && s.score < 20).length,
+      excellent: scored.filter(s => s.score >= 75).length,
+      strong: scored.filter(s => s.score >= 60 && s.score < 75).length,
+      good: scored.filter(s => s.score >= 50 && s.score < 60).length,
+      moderate: scored.filter(s => s.score >= 40 && s.score < 50).length,
+      baseline: scored.filter(s => s.score >= 30 && s.score < 40).length,
+      low: scored.filter(s => s.score > 0 && s.score < 30).length,
       zero: scored.filter(s => s.score === 0).length
     };
-    console.log(`📊 Score Distribution: 70+:${scoreRanges.excellent}, 50-69:${scoreRanges.good}, 30-49:${scoreRanges.fair}, 20-29:${scoreRanges.weak}, 1-19:${scoreRanges.veryWeak}, 0:${scoreRanges.zero}`);
-    console.log(`📊 Brainstorm: ${scored.length} candidates, ${filtered.length} above threshold (${threshold} points), selected top ${brainstorm.length}`);
+    console.log(`📊 Score Distribution: 75+:${scoreRanges.excellent}, 60-74:${scoreRanges.strong}, 50-59:${scoreRanges.good}, 40-49:${scoreRanges.moderate}, 30-39:${scoreRanges.baseline}, 1-29:${scoreRanges.low}, 0:${scoreRanges.zero}`);
+    console.log(`📊 Brainstorm: ${scored.length} total candidates, ${filtered.length} valid matches (all included - no filtering)`);
 
     // Generate AI rationales for brainstorm matches (using GPT-4o for maximum quality)
     console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (using GPT-4o - may take 1-3 minutes)...`);
@@ -822,6 +914,16 @@ async function generateMatchRationale(member1, member2, useGPT4 = false) {
 4. **Market Intelligence Analyst** - Equipped with recent news, trends, and company developments
 
 ${industryContexts}${crossIndustryNote}${roleContext}
+
+🎯 CORE PHILOSOPHY: Every business professional has networking potential. This match has been scored using a 6-category system:
+1. Universal Business Potential (30 pts baseline) - All entrepreneurs share common ground
+2. Semantic Profile Similarity (0-20 pts) - AI embedding analysis
+3. Complementary Value Exchange (0-20 pts) - Direct asset/need matches
+4. Market Alignment (0-15 pts) - Inferred business model, scale, growth stage compatibility
+5. Geographic & Logistical Synergy (0-10 pts) - Local vs remote collaboration opportunities
+6. Strategic Growth Opportunities (0-5 pts) - Cross-industry innovation potential
+
+Your job is to articulate the SPECIFIC VALUE in THIS connection, regardless of score. Even "moderate" matches (40-60 pts) can yield breakthrough collaborations when approached strategically.
 
 YOUR MISSION: Create a personalized, research-backed networking introduction that speaks directly to ${member1.name} about why connecting with ${member2.name} from ${member2.org} will drive TANGIBLE BUSINESS VALUE.
 
