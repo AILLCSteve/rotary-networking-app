@@ -76,7 +76,7 @@ INSERT INTO admin_users (admin_id, email, password_hash)
 VALUES (
   'admin-1',
   'admin',
-  '$2b$10$rZ9h4mGJxVKjzHf5qQZP0eDqF8LCqZGRQqZGJmV5ZGRQqZGJmV5ZG'
+  '$2b$10$E1EIts/AegZ0fXn7lWN8peLqcoJZAM6hq6eMO8JcJyXl9ukcL/sJW'
 )
 ON CONFLICT (admin_id) DO NOTHING;
 
