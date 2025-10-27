@@ -427,34 +427,64 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       WHERE m.member_id != $1 AND m.consent = true
     `, [memberId]);
 
-    // Calculate scores
-    const scored = candidates.map(candidate => {
-      const candidateEmbedding = JSON.parse(candidate.embedding_ops);
-      const similarity = cosineSimilarity(memberEmbedding, candidateEmbedding);
-      const scoreData = calculateMatchScore(member, candidate, similarity);
+    // Calculate scores with error handling
+    console.log(`⚙️  Calculating match scores for ${candidates.length} candidates...`);
+    const scored = candidates.map((candidate, idx) => {
+      try {
+        const candidateEmbedding = JSON.parse(candidate.embedding_ops);
+        const similarity = cosineSimilarity(memberEmbedding, candidateEmbedding);
+        const scoreData = calculateMatchScore(member, candidate, similarity);
 
-      return {
-        ...candidate,
-        score: scoreData.score,
-        breakdown: scoreData.breakdown,
-        matches: scoreData.matches,
-        similarity
-      };
+        return {
+          ...candidate,
+          score: scoreData.score,
+          breakdown: scoreData.breakdown,
+          fullBreakdown: scoreData.fullBreakdown,
+          matches: scoreData.matches,
+          summary: scoreData.summary,
+          similarity
+        };
+      } catch (error) {
+        console.error(`   ❌ Error scoring candidate ${idx + 1} (${candidate.name}):`, error.message);
+        // Return a zero-score entry so we can continue
+        return {
+          ...candidate,
+          score: 0,
+          breakdown: [],
+          fullBreakdown: [],
+          matches: [],
+          summary: { earned: 0, possible: 100, percentage: 0, grade: 'F' },
+          similarity: 0,
+          error: error.message
+        };
+      }
     });
+    console.log(`✅ Scoring complete`);
 
-    // Log all scores for debugging
-    console.log(`📊 Calculated ${scored.length} match scores:`);
-    scored.forEach((s, i) => {
-      console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 points (${s.summary.grade} grade)`);
-      console.log(`      Breakdown: Semantic=${s.breakdown[0].points}/40, Complementary=${s.breakdown[1].points}/30, Location=${s.breakdown[2].points}/15, Industry=${s.breakdown[3].points}/10, Constraint=${s.breakdown[4].points}/5`);
-    });
-
-    // Filter out self-matches and sort
+    // Filter out self-matches and sort FIRST (before logging to avoid crashes)
     const filtered = scored.filter(s => s.score > 0);
     filtered.sort((a, b) => b.score - a.score);
     const top3 = filtered.slice(0, 3);
 
-    console.log(`✅ Selected top ${top3.length} matches (from ${filtered.length} candidates with score > 0)`);
+    // Log filtered scores for debugging (safe - already filtered)
+    console.log(`📊 Calculated ${scored.length} candidates, ${filtered.length} with score > 0:`);
+    try {
+      filtered.slice(0, 10).forEach((s, i) => {
+        const grade = s.summary?.grade || '?';
+        const semantic = s.breakdown?.[0]?.points || 0;
+        const complementary = s.breakdown?.[1]?.points || 0;
+        const location = s.breakdown?.[2]?.points || 0;
+        const industry = s.breakdown?.[3]?.points || 0;
+        const constraint = s.breakdown?.[4]?.points || 0;
+
+        console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 (${grade})`);
+        console.log(`      → ${semantic}/40 semantic, ${complementary}/30 complementary, ${location}/15 location, ${industry}/10 industry, ${constraint}/5 constraint`);
+      });
+    } catch (logError) {
+      console.error('⚠️  Logging error (non-critical):', logError.message);
+    }
+
+    console.log(`✅ Selected top ${top3.length} matches`);
 
     // Generate rationales for each match (with progress logging)
     console.log(`🤖 Generating AI intros for ${top3.length} matches...`);
@@ -543,26 +573,46 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
       WHERE m.member_id != $1 AND m.consent = true
     `, [memberId]);
 
-    // Calculate scores
-    const scored = candidates.map(candidate => {
-      const candidateEmbedding = JSON.parse(candidate.embedding_ops);
-      const similarity = cosineSimilarity(memberEmbedding, candidateEmbedding);
-      const scoreData = calculateMatchScore(member, candidate, similarity);
+    // Calculate scores with error handling
+    console.log(`⚙️  Calculating match scores for ${candidates.length} candidates...`);
+    const scored = candidates.map((candidate, idx) => {
+      try {
+        const candidateEmbedding = JSON.parse(candidate.embedding_ops);
+        const similarity = cosineSimilarity(memberEmbedding, candidateEmbedding);
+        const scoreData = calculateMatchScore(member, candidate, similarity);
 
-      return {
-        ...candidate,
-        score: scoreData.score,
-        breakdown: scoreData.breakdown,
-        matches: scoreData.matches,
-        similarity
-      };
+        return {
+          ...candidate,
+          score: scoreData.score,
+          breakdown: scoreData.breakdown,
+          fullBreakdown: scoreData.fullBreakdown,
+          matches: scoreData.matches,
+          summary: scoreData.summary,
+          similarity
+        };
+      } catch (error) {
+        console.error(`   ❌ Error scoring candidate ${idx + 1} (${candidate.name}):`, error.message);
+        return {
+          ...candidate,
+          score: 0,
+          breakdown: [],
+          fullBreakdown: [],
+          matches: [],
+          summary: { earned: 0, possible: 100, percentage: 0, grade: 'F' },
+          similarity: 0,
+          error: error.message
+        };
+      }
     });
+    console.log(`✅ Scoring complete`);
 
     // Filter by threshold and sort (exclude self-matches)
     const threshold = 40; // Minimum score threshold
     const filtered = scored.filter(c => c.score >= threshold);
     filtered.sort((a, b) => b.score - a.score);
     const brainstorm = filtered.slice(0, 20); // Limit to 20 for quality AI generation
+
+    console.log(`📊 Brainstorm: ${scored.length} candidates, ${filtered.length} above threshold (${threshold} points), selected top ${brainstorm.length}`);
 
     // Generate AI rationales for brainstorm matches (using GPT-3.5 for speed/cost balance)
     console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (this may take a minute)...`);
