@@ -324,16 +324,32 @@ app.get('/api/member/:memberId', async (req, res) => {
 app.post('/api/generate-top3/:memberId', async (req, res) => {
   try {
     const { memberId } = req.params;
+    console.log(`🎯 Generating top 3 matches for member: ${memberId}`);
 
     // Get member and their embedding
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
-    const memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+    if (!member) {
+      console.error(`❌ Member not found: ${memberId}`);
+      return res.status(404).json({ error: 'Member not found' });
+    }
 
-    if (!member || !memberVector) {
-      return res.status(400).json({ error: 'Member data not ready' });
+    let memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+
+    // Auto-generate embedding if missing (for test data or new members)
+    if (!memberVector || !memberVector.embedding_ops) {
+      console.log(`⚡ No embedding found for ${member.name}, generating now...`);
+      await generateEmbedding(memberId);
+      memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+
+      if (!memberVector || !memberVector.embedding_ops) {
+        console.error(`❌ Failed to generate embedding for ${member.name}`);
+        return res.status(500).json({ error: 'Failed to generate embedding. Please try again.' });
+      }
+      console.log(`✅ Embedding generated for ${member.name}`);
     }
 
     const memberEmbedding = JSON.parse(memberVector.embedding_ops);
+    console.log(`📊 Processing ${member.name} against all candidates...`);
 
     // Get all other members with embeddings
     const candidates = await db.all(`
@@ -363,29 +379,38 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     filtered.sort((a, b) => b.score - a.score);
     const top3 = filtered.slice(0, 3);
 
-    // Generate rationales for each match
-    for (const match of top3) {
-      const rationale = await generateMatchRationale(member, match, true); // true = use GPT-4
+    // Generate rationales for each match (with progress logging)
+    console.log(`🤖 Generating AI intros for ${top3.length} matches...`);
+    for (let i = 0; i < top3.length; i++) {
+      const match = top3[i];
+      console.log(`   [${i + 1}/${top3.length}] Generating intro for ${member.name} → ${match.name}...`);
 
-      // Log the rationale to debug
-      console.log('Generated rationale:', JSON.stringify(rationale, null, 2));
+      try {
+        const rationale = await generateMatchRationale(member, match, true); // true = use GPT-4
 
-      // Ensure intro_basis is a string (handle if AI returns object)
-      let introBasisString = rationale.intro_basis;
-      if (typeof introBasisString === 'object') {
-        console.log('intro_basis is an object, converting to string');
-        introBasisString = JSON.stringify(introBasisString);
+        // Ensure intro_basis is a string (handle if AI returns object)
+        let introBasisString = rationale.intro_basis;
+        if (typeof introBasisString === 'object') {
+          console.log('   ⚠️  intro_basis is an object, converting to string');
+          introBasisString = JSON.stringify(introBasisString);
+        }
+
+        const introId = generateId('intro');
+        await db.run(`
+          INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (for_member_id, to_member_id, tier)
+          DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
+        `, [introId, memberId, match.member_id, 'top3', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+
+        console.log(`   ✅ Generated intro for ${match.name}`);
+      } catch (error) {
+        console.error(`   ❌ Failed to generate intro for ${match.name}:`, error.message);
+        // Continue with other matches even if one fails
       }
-
-      const introId = generateId('intro');
-      await db.run(`
-        INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (for_member_id, to_member_id, tier)
-        DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-      `, [introId, memberId, match.member_id, 'top3', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
     }
 
+    console.log(`✅ Successfully generated ${top3.length} top 3 matches for ${member.name}`);
     res.json({ success: true, count: top3.length });
   } catch (error) {
     console.error('Generate top3 error:', error);
@@ -397,16 +422,32 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
 app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
   try {
     const { memberId } = req.params;
+    console.log(`🌟 Generating brainstorm matches for member: ${memberId}`);
 
     // Get member and their embedding
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
-    const memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+    if (!member) {
+      console.error(`❌ Member not found: ${memberId}`);
+      return res.status(404).json({ error: 'Member not found' });
+    }
 
-    if (!member || !memberVector) {
-      return res.status(400).json({ error: 'Member data not ready' });
+    let memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+
+    // Auto-generate embedding if missing (for test data or new members)
+    if (!memberVector || !memberVector.embedding_ops) {
+      console.log(`⚡ No embedding found for ${member.name}, generating now...`);
+      await generateEmbedding(memberId);
+      memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+
+      if (!memberVector || !memberVector.embedding_ops) {
+        console.error(`❌ Failed to generate embedding for ${member.name}`);
+        return res.status(500).json({ error: 'Failed to generate embedding. Please try again.' });
+      }
+      console.log(`✅ Embedding generated for ${member.name}`);
     }
 
     const memberEmbedding = JSON.parse(memberVector.embedding_ops);
+    console.log(`📊 Processing ${member.name} against all candidates for brainstorm...`);
 
     // Get all other members with embeddings
     const candidates = await db.all(`
@@ -438,24 +479,37 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     const brainstorm = filtered.slice(0, 20); // Limit to 20 for quality AI generation
 
     // Generate AI rationales for brainstorm matches (using GPT-3.5 for speed/cost balance)
-    for (const match of brainstorm) {
-      const rationale = await generateMatchRationale(member, match, false); // false = use GPT-3.5
+    console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (this may take a minute)...`);
+    for (let i = 0; i < brainstorm.length; i++) {
+      const match = brainstorm[i];
+      console.log(`   [${i + 1}/${brainstorm.length}] Generating intro for ${member.name} → ${match.name}...`);
 
-      // Ensure intro_basis is a string (handle if AI returns object)
-      let introBasisString = rationale.intro_basis;
-      if (typeof introBasisString === 'object') {
-        introBasisString = JSON.stringify(introBasisString);
+      try {
+        const rationale = await generateMatchRationale(member, match, false); // false = use GPT-3.5
+
+        // Ensure intro_basis is a string (handle if AI returns object)
+        let introBasisString = rationale.intro_basis;
+        if (typeof introBasisString === 'object') {
+          console.log('   ⚠️  intro_basis is an object, converting to string');
+          introBasisString = JSON.stringify(introBasisString);
+        }
+
+        const introId = generateId('intro');
+        await db.run(`
+          INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (for_member_id, to_member_id, tier)
+          DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
+        `, [introId, memberId, match.member_id, 'brainstorm', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+
+        console.log(`   ✅ Generated intro for ${match.name}`);
+      } catch (error) {
+        console.error(`   ❌ Failed to generate intro for ${match.name}:`, error.message);
+        // Continue with other matches even if one fails
       }
-
-      const introId = generateId('intro');
-      await db.run(`
-        INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (for_member_id, to_member_id, tier)
-        DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-      `, [introId, memberId, match.member_id, 'brainstorm', match.score, JSON.stringify(match.breakdown), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
     }
 
+    console.log(`✅ Successfully generated ${brainstorm.length} brainstorm matches for ${member.name}`);
     res.json({ success: true, count: brainstorm.length });
   } catch (error) {
     console.error('Generate brainstorm error:', error);
@@ -658,16 +712,22 @@ Return as JSON with keys: rationale_ops, creative_angle, intro_basis`;
     // Choose model based on tier - GPT-4o has better research capabilities
     const model = useGPT4 ? 'gpt-4o' : 'gpt-3.5-turbo';
 
-    const response = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.85, // Slightly higher for creativity while maintaining accuracy
-      max_tokens: 1200, // Increased for three approaches
-      response_format: { type: 'json_object' }
-    });
+    console.log(`   🤖 Calling ${model} for match analysis...`);
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.85, // Slightly higher for creativity while maintaining accuracy
+        max_tokens: 1500, // Sufficient for detailed three-part response
+        response_format: { type: 'json_object' }
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), 60000)
+      )
+    ]);
 
     const result = JSON.parse(response.choices[0].message.content);
 
