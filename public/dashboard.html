@@ -224,12 +224,12 @@
             try {
                 const response = await fetch('/api/dashboard/stats');
                 const data = await response.json();
-                
-                // Update numbers with animation
-                animateNumber('statMembers', data.stats.total_members || 0);
-                animateNumber('statTop3', data.stats.total_top3 || 0);
-                animateNumber('statBrainstorm', data.stats.total_brainstorm || 0);
-                animateNumber('statIntros', data.stats.total_acknowledged || 0);
+
+                // Update numbers with animation - ensure integers
+                animateNumber('statMembers', parseInt(data.stats.total_members) || 0);
+                animateNumber('statTop3', parseInt(data.stats.total_top3) || 0);
+                animateNumber('statBrainstorm', parseInt(data.stats.total_brainstorm) || 0);
+                animateNumber('statIntros', parseInt(data.stats.total_acknowledged) || 0);
                 
                 // Update activity feed
                 if (data.recentActivity && data.recentActivity.length > 0) {
@@ -258,7 +258,8 @@
         function animateNumber(elementId, target) {
             const element = document.getElementById(elementId);
             const current = parseInt(element.textContent) || 0;
-            
+            target = parseInt(target) || 0; // Ensure target is always an integer
+
             if (current !== target) {
                 const increment = target > current ? 1 : -1;
                 const steps = Math.abs(target - current);

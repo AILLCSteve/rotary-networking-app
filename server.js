@@ -683,18 +683,18 @@ app.get('/api/admin/members', async (req, res) => {
   if (!req.session.adminId) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
-  
+
   try {
     const members = await db.all(`
-      SELECT 
+      SELECT
         m.*,
-        (SELECT COUNT(*) FROM intros WHERE for_member_id = m.member_id AND tier = 'top3') as top3_count,
-        (SELECT COUNT(*) FROM intros WHERE for_member_id = m.member_id AND tier = 'brainstorm') as brainstorm_count,
-        (SELECT COUNT(*) FROM intros WHERE for_member_id = m.member_id AND status = 'acknowledged') as acknowledged_count
+        (SELECT COUNT(*)::int FROM intros WHERE for_member_id = m.member_id AND tier = 'top3') as top3_count,
+        (SELECT COUNT(*)::int FROM intros WHERE for_member_id = m.member_id AND tier = 'brainstorm') as brainstorm_count,
+        (SELECT COUNT(*)::int FROM intros WHERE for_member_id = m.member_id AND status = 'acknowledged') as acknowledged_count
       FROM members m
       ORDER BY m.created_at DESC
     `);
-    
+
     res.json(members);
   } catch (error) {
     console.error('Admin members error:', error);
@@ -750,25 +750,27 @@ app.delete('/api/admin/members/all', async (req, res) => {
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
     const stats = await db.get(`
-      SELECT 
-        (SELECT COUNT(*) FROM members) as total_members,
-        (SELECT COUNT(*) FROM intros WHERE tier = 'top3') as total_top3,
-        (SELECT COUNT(*) FROM intros WHERE tier = 'brainstorm') as total_brainstorm,
-        (SELECT COUNT(*) FROM intros WHERE status = 'acknowledged') as total_acknowledged
+      SELECT
+        (SELECT COUNT(*)::int FROM members) as total_members,
+        (SELECT COUNT(*)::int FROM intros WHERE tier = 'top3') as total_top3,
+        (SELECT COUNT(*)::int FROM intros WHERE tier = 'brainstorm') as total_brainstorm,
+        (SELECT COUNT(*)::int FROM intros WHERE status = 'acknowledged') as total_acknowledged
     `);
-    
+
     const recentActivity = await db.all(`
-      SELECT m.name, m.org, 'registered' as action, m.created_at as timestamp
-      FROM members m
-      UNION ALL
-      SELECT m.name, m.org, 'acknowledged intro' as action, i.created_at as timestamp
-      FROM intros i
-      JOIN members m ON i.for_member_id = m.member_id
-      WHERE i.status = 'acknowledged'
+      SELECT * FROM (
+        SELECT m.name, m.org, 'registered' as action, m.created_at as timestamp
+        FROM members m
+        UNION ALL
+        SELECT m.name, m.org, 'acknowledged intro' as action, i.created_at as timestamp
+        FROM intros i
+        JOIN members m ON i.for_member_id = m.member_id
+        WHERE i.status = 'acknowledged'
+      ) activities
       ORDER BY timestamp DESC
       LIMIT 10
     `);
-    
+
     res.json({ stats, recentActivity });
   } catch (error) {
     console.error('Dashboard stats error:', error);
