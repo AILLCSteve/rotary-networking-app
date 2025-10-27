@@ -761,8 +761,8 @@ app.get('/api/dashboard/stats', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
   console.log('Make sure to run "npm run init-db" to initialize the database');
   console.log('Set OPENAI_API_KEY in .env file for AI features');
 });
