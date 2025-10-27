@@ -25,8 +25,9 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-    httpOnly: true
+    secure: false, // Allow cookies over HTTP and HTTPS (needed for Render)
+    httpOnly: true,
+    sameSite: 'lax' // Allow cookies to work across page navigations
   }
 }));
 
@@ -61,6 +62,18 @@ app.get('/db/count', async (req, res) => {
       code: error.code
     });
   }
+});
+
+// Admin session check endpoint - TEMPORARY for debugging
+// TODO: Remove this after verifying session works
+app.get('/api/admin/session-check', (req, res) => {
+  res.json({
+    hasSession: !!req.session,
+    sessionID: req.sessionID,
+    adminId: req.session?.adminId || null,
+    isAuthenticated: !!req.session?.adminId,
+    cookie: req.session?.cookie
+  });
 });
 
 // Helper functions
@@ -653,22 +666,26 @@ app.post('/api/acknowledge-intro/:introId', async (req, res) => {
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log('Admin login attempt:', email);
 
     const admin = await db.get('SELECT * FROM admin_users WHERE email = $1', [email]);
     if (!admin) {
+      console.log('Admin not found:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const valid = await bcrypt.compare(password, admin.password_hash);
     if (!valid) {
+      console.log('Invalid password for admin:', email);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     req.session.adminId = admin.admin_id;
-    res.json({ success: true });
+    console.log('Admin login successful:', email, 'Session ID:', req.sessionID);
+    res.json({ success: true, message: 'Logged in successfully' });
   } catch (error) {
     console.error('Admin login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Login failed', details: error.message });
   }
 });
 
@@ -680,7 +697,10 @@ app.post('/api/admin/logout', (req, res) => {
 
 // Admin dashboard
 app.get('/api/admin/members', async (req, res) => {
+  console.log('Admin members request - Session ID:', req.sessionID, 'Admin ID:', req.session.adminId);
+
   if (!req.session.adminId) {
+    console.log('Admin not authenticated - no session');
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
@@ -695,10 +715,11 @@ app.get('/api/admin/members', async (req, res) => {
       ORDER BY m.created_at DESC
     `);
 
+    console.log(`Admin members loaded: ${members.length} members found`);
     res.json(members);
   } catch (error) {
     console.error('Admin members error:', error);
-    res.status(500).json({ error: 'Failed to load members' });
+    res.status(500).json({ error: 'Failed to load members', details: error.message });
   }
 });
 

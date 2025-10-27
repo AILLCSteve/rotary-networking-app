@@ -92,10 +92,16 @@
         // Check if already authenticated
         async function checkAuth() {
             try {
+                console.log('Checking authentication...');
                 const response = await fetch('/api/admin/members');
+                console.log('Auth check response status:', response.status);
+
                 if (response.ok) {
+                    console.log('Already authenticated, showing admin panel');
                     isAuthenticated = true;
                     showAdminPanel();
+                } else {
+                    console.log('Not authenticated, showing login form');
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
@@ -149,14 +155,29 @@
         async function loadMembers() {
             try {
                 const response = await fetch('/api/admin/members');
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Failed to load members:', error);
+                    if (response.status === 401) {
+                        // Not authenticated - show login
+                        isAuthenticated = false;
+                        loginSection.classList.remove('hidden');
+                        adminSection.classList.add('hidden');
+                        return;
+                    }
+                    throw new Error(error.error || 'Failed to load members');
+                }
+
                 const members = await response.json();
-                
-                // Update stats
+                console.log('Members loaded:', members.length, 'members');
+
+                // Update stats - ensure all counts are parsed as integers
                 const totalMembers = members.length;
-                const totalTop3 = members.reduce((sum, m) => sum + (m.top3_count || 0), 0);
-                const totalBrainstorm = members.reduce((sum, m) => sum + (m.brainstorm_count || 0), 0);
-                const totalAcknowledged = members.reduce((sum, m) => sum + (m.acknowledged_count || 0), 0);
-                
+                const totalTop3 = members.reduce((sum, m) => sum + (parseInt(m.top3_count) || 0), 0);
+                const totalBrainstorm = members.reduce((sum, m) => sum + (parseInt(m.brainstorm_count) || 0), 0);
+                const totalAcknowledged = members.reduce((sum, m) => sum + (parseInt(m.acknowledged_count) || 0), 0);
+
                 document.getElementById('totalMembers').textContent = totalMembers;
                 document.getElementById('totalTop3').textContent = totalTop3;
                 document.getElementById('totalBrainstorm').textContent = totalBrainstorm;
@@ -172,15 +193,19 @@
                 
                 tbody.innerHTML = members.map(member => {
                     const registeredTime = new Date(member.created_at).toLocaleString();
+                    const top3Count = parseInt(member.top3_count) || 0;
+                    const brainstormCount = parseInt(member.brainstorm_count) || 0;
+                    const acknowledgedCount = parseInt(member.acknowledged_count) || 0;
+
                     return `
                         <tr>
                             <td>${member.name}</td>
                             <td>${member.org}</td>
                             <td>${member.role}</td>
                             <td class="timestamp">${registeredTime}</td>
-                            <td class="center">${member.top3_count || 0}</td>
-                            <td class="center">${member.brainstorm_count || 0}</td>
-                            <td class="center">${member.acknowledged_count || 0}</td>
+                            <td class="center">${top3Count}</td>
+                            <td class="center">${brainstormCount}</td>
+                            <td class="center">${acknowledgedCount}</td>
                             <td>
                                 <button class="btn btn-small" onclick="viewAsParticipant('${member.member_id}')">
                                     View Dashboard
