@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Rotary Networking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Admin Panel</h1>
+            <button class="btn btn-small" id="logoutBtn">Logout</button>
+        </div>
+
+        <div id="loginSection" class="card">
+            <h2>Admin Login</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Username</label>
+                    <input type="text" id="email" name="email" required value="admin">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                    <small>Default: admin</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+        </div>
+
+        <div id="adminSection" class="hidden">
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-label">Total Members</span>
+                    <span class="stat-value" id="totalMembers">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Top 3 Generated</span>
+                    <span class="stat-value" id="totalTop3">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Brainstorm Generated</span>
+                    <span class="stat-value" id="totalBrainstorm">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Introductions Made</span>
+                    <span class="stat-value" id="totalAcknowledged">0</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Registered Members</h2>
+                <div class="table-container">
+                    <table id="membersTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Organization</th>
+                                <th>Role</th>
+                                <th>Registered</th>
+                                <th>Top 3</th>
+                                <th>Brainstorm</th>
+                                <th>Introduced</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="membersTableBody">
+                            <tr>
+                                <td colspan="8" class="loading">Loading members...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <a href="/dashboard.html" class="btn btn-secondary" target="_blank">Open Public Dashboard</a>
+                <button class="btn btn-secondary" id="refreshBtn">Refresh Data</button>
+                <button class="btn btn-secondary" id="deleteAllBtn" style="background: #f44336; color: white;">Delete All Members</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const loginSection = document.getElementById('loginSection');
+        const adminSection = document.getElementById('adminSection');
+        const loginForm = document.getElementById('loginForm');
+        
+        let isAuthenticated = false;
+        
+        // Check if already authenticated
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/admin/members');
+                if (response.ok) {
+                    isAuthenticated = true;
+                    showAdminPanel();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+            }
+        }
+        
+        // Login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(loginForm);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    isAuthenticated = true;
+                    showAdminPanel();
+                } else {
+                    alert('Invalid credentials');
+                }
+            } catch (error) {
+                alert('Login failed');
+                console.error(error);
+            }
+        });
+        
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/admin/logout', { method: 'POST' });
+            isAuthenticated = false;
+            loginSection.classList.remove('hidden');
+            adminSection.classList.add('hidden');
+        });
+        
+        // Show admin panel
+        function showAdminPanel() {
+            loginSection.classList.add('hidden');
+            adminSection.classList.remove('hidden');
+            loadMembers();
+        }
+        
+        // Load members
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/admin/members');
+                const members = await response.json();
+                
+                // Update stats
+                const totalMembers = members.length;
+                const totalTop3 = members.reduce((sum, m) => sum + (m.top3_count || 0), 0);
+                const totalBrainstorm = members.reduce((sum, m) => sum + (m.brainstorm_count || 0), 0);
+                const totalAcknowledged = members.reduce((sum, m) => sum + (m.acknowledged_count || 0), 0);
+                
+                document.getElementById('totalMembers').textContent = totalMembers;
+                document.getElementById('totalTop3').textContent = totalTop3;
+                document.getElementById('totalBrainstorm').textContent = totalBrainstorm;
+                document.getElementById('totalAcknowledged').textContent = totalAcknowledged;
+                
+                // Populate table
+                const tbody = document.getElementById('membersTableBody');
+                
+                if (members.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="no-data">No members registered yet</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = members.map(member => {
+                    const registeredTime = new Date(member.created_at).toLocaleString();
+                    return `
+                        <tr>
+                            <td>${member.name}</td>
+                            <td>${member.org}</td>
+                            <td>${member.role}</td>
+                            <td class="timestamp">${registeredTime}</td>
+                            <td class="center">${member.top3_count || 0}</td>
+                            <td class="center">${member.brainstorm_count || 0}</td>
+                            <td class="center">${member.acknowledged_count || 0}</td>
+                            <td>
+                                <button class="btn btn-small" onclick="viewAsParticipant('${member.member_id}')">
+                                    View Dashboard
+                                </button>
+                                <button class="btn btn-small" onclick="deleteMember('${member.member_id}', '${member.name}')" style="background: #f44336; color: white; margin-left: 0.5rem;">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Failed to load members:', error);
+                document.getElementById('membersTableBody').innerHTML = 
+                    '<tr><td colspan="8" class="error">Failed to load members</td></tr>';
+            }
+        }
+        
+        // View as participant
+        function viewAsParticipant(memberId) {
+            window.open(`/matches.html?id=${memberId}`, '_blank');
+        }
+
+        // Delete member
+        async function deleteMember(memberId, memberName) {
+            if (!confirm(`Are you sure you want to delete ${memberName}? This will also delete all their matches and introductions.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/member/${memberId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert(`${memberName} has been deleted successfully.`);
+                    loadMembers();
+                } else {
+                    alert('Failed to delete member.');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Failed to delete member.');
+            }
+        }
+
+        // Delete all members
+        document.getElementById('deleteAllBtn').addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to DELETE ALL MEMBERS? This cannot be undone!')) {
+                return;
+            }
+
+            if (!confirm('This will delete ALL members and ALL their data. Are you absolutely sure?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/members/all', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('All members have been deleted successfully.');
+                    loadMembers();
+                } else {
+                    alert('Failed to delete all members.');
+                }
+            } catch (error) {
+                console.error('Delete all error:', error);
+                alert('Failed to delete all members.');
+            }
+        });
+
+        // Refresh button
+        document.getElementById('refreshBtn').addEventListener('click', loadMembers);
+        
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            if (isAuthenticated) {
+                loadMembers();
+            }
+        }, 10000);
+        
+        // Initial check
+        checkAuth();
+    </script>
+</body>
+</html>

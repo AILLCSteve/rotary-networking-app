@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Networking Matches</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤝 Your Networking Matches</h1>
+            <div id="memberInfo" class="member-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>🌟 Your Top 3 Matches</h2>
+            <p class="info">These are your highest-scored potential connections based on complementary needs and assets</p>
+            
+            <div class="action-bar">
+                <button class="btn btn-primary" id="generateTop3">Generate My Top 3 Matches</button>
+                <span id="top3Status" class="status-message"></span>
+            </div>
+            
+            <div id="top3Matches" class="matches-grid"></div>
+        </div>
+
+        <div class="section">
+            <h2>💡 Explore More Connections</h2>
+            <p class="info">Brainstorm opportunities with everyone who opted in</p>
+            
+            <div class="action-bar">
+                <button class="btn btn-secondary" id="generateBrainstorm">Brainstorm with Everyone</button>
+                <span id="brainstormStatus" class="status-message"></span>
+            </div>
+            
+            <div id="brainstormMatches" class="matches-grid"></div>
+        </div>
+
+        <!-- Intro Modal -->
+        <div id="introModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" id="closeModal">&times;</span>
+                <h3>Introduction Starter</h3>
+                <div id="modalContent"></div>
+                <button class="btn btn-primary" id="markAcknowledged">Mark as Introduced</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get member ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const memberId = urlParams.get('id');
+        
+        if (!memberId) {
+            alert('No member ID provided. Please register first.');
+            window.location.href = '/';
+        }
+        
+        let currentIntroId = null;
+        
+        // Load member data and matches
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`/api/member/${memberId}`);
+                const data = await response.json();
+                
+                // Display member info
+                document.getElementById('memberInfo').innerHTML = `
+                    <strong>${data.member.name}</strong> | ${data.member.org} | ${data.member.role}
+                `;
+                
+                // Display top 3 matches
+                displayMatches(data.top3, 'top3Matches');
+                
+                // Display brainstorm matches
+                displayMatches(data.brainstorm, 'brainstormMatches');
+                
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+        
+        function displayMatches(matches, containerId) {
+            const container = document.getElementById(containerId);
+
+            if (!matches || matches.length === 0) {
+                container.innerHTML = '<p class="no-matches">No matches generated yet. Click the button above to generate matches.</p>';
+                return;
+            }
+
+            container.innerHTML = matches.map(match => {
+                // Parse score breakdown if available
+                let scoreBreakdownHTML = '';
+                if (match.score_breakdown) {
+                    try {
+                        const breakdown = typeof match.score_breakdown === 'string'
+                            ? JSON.parse(match.score_breakdown)
+                            : match.score_breakdown;
+
+                        scoreBreakdownHTML = `
+                            <div class="score-breakdown">
+                                <strong>Match Score: ${Math.round(match.score)}/100</strong>
+                                <ul class="breakdown-list">
+                                    ${breakdown.map(item => `
+                                        <li>
+                                            <span class="factor">${item.factor}:</span>
+                                            <span class="points">+${item.points} pts</span>
+                                            <span class="description">${item.description}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    } catch (e) {
+                        scoreBreakdownHTML = `<p class="match-score">Match Score: ${Math.round(match.score)}/100</p>`;
+                    }
+                } else {
+                    scoreBreakdownHTML = match.score ? `<p class="match-score">Match Score: ${Math.round(match.score)}/100</p>` : '';
+                }
+
+                return `
+                <div class="match-card ${match.status === 'acknowledged' ? 'acknowledged' : ''}" data-intro-id="${match.intro_id}">
+                    <div class="match-header">
+                        <h4>${match.name}</h4>
+                        <span class="match-org">${match.org}</span>
+                        ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
+                    </div>
+                    <div class="match-details">
+                        <p class="match-role">${match.role} • ${match.city || 'Location not specified'}</p>
+                        ${scoreBreakdownHTML}
+                    </div>
+                    <div class="match-rationale">
+                        ${match.rationale_ops ? `
+                            <div class="rationale-item">
+                                <strong>Ops Rationale:</strong>
+                                <p>${match.rationale_ops}</p>
+                            </div>
+                        ` : ''}
+                        ${match.creative_angle ? `
+                            <div class="rationale-item">
+                                <strong>Creative Angle:</strong>
+                                <p>${match.creative_angle}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <button class="btn btn-small intro-btn" data-intro-id="${match.intro_id}">
+                        View Introduction Starter
+                    </button>
+                </div>
+            `;
+            }).join('');
+
+            // Add event listeners to intro buttons
+            document.querySelectorAll('.intro-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const introId = this.dataset.introId;
+                    // Find the match data from the matches array
+                    const match = matches.find(m => m.intro_id === introId);
+                    console.log('Match found:', match);
+                    console.log('intro_basis type:', typeof match?.intro_basis);
+                    console.log('intro_basis value:', match?.intro_basis);
+                    const introBasis = match ? (match.intro_basis || 'Start a conversation about how you can help each other.') : 'No introduction available.';
+                    showIntro(introId, introBasis);
+                });
+            });
+        }
+
+        function escapeForAttribute(text) {
+            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showIntro(introId, introBasis) {
+            currentIntroId = introId;
+
+            // Handle if introBasis is an object or string
+            let displayText = introBasis;
+            if (typeof introBasis === 'object') {
+                // If it's an object, stringify it nicely or extract text
+                displayText = JSON.stringify(introBasis, null, 2);
+            }
+
+            // Replace newlines with <br> for better formatting
+            displayText = displayText.replace(/\n/g, '<br>');
+
+            document.getElementById('modalContent').innerHTML = `<div style="white-space: pre-wrap;">${displayText}</div>`;
+            document.getElementById('introModal').classList.remove('hidden');
+        }
+        
+        // Generate Top 3
+        document.getElementById('generateTop3').addEventListener('click', async () => {
+            const btn = document.getElementById('generateTop3');
+            const status = document.getElementById('top3Status');
+            
+            btn.disabled = true;
+            status.textContent = 'Generating your top matches...';
+            
+            try {
+                const response = await fetch(`/api/generate-top3/${memberId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = `✓ Generated ${result.count} top matches!`;
+                    setTimeout(loadDashboard, 1000);
+                }
+            } catch (error) {
+                status.textContent = 'Failed to generate matches';
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        
+        // Generate Brainstorm
+        document.getElementById('generateBrainstorm').addEventListener('click', async () => {
+            const btn = document.getElementById('generateBrainstorm');
+            const status = document.getElementById('brainstormStatus');
+            
+            btn.disabled = true;
+            status.textContent = 'Generating extended matches... This may take a moment...';
+            
+            try {
+                const response = await fetch(`/api/generate-brainstorm/${memberId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = `✓ Generated ${result.count} potential connections!`;
+                    setTimeout(loadDashboard, 1000);
+                }
+            } catch (error) {
+                status.textContent = 'Failed to generate brainstorm matches';
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        
+        // Modal controls
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('introModal').classList.add('hidden');
+        });
+        
+        document.getElementById('markAcknowledged').addEventListener('click', async () => {
+            if (currentIntroId) {
+                await fetch(`/api/acknowledge-intro/${currentIntroId}`, { method: 'POST' });
+                document.getElementById('introModal').classList.add('hidden');
+                loadDashboard();
+            }
+        });
+        
+        // Initial load
+        loadDashboard();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>
