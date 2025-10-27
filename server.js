@@ -76,6 +76,115 @@ app.get('/api/admin/session-check', (req, res) => {
   });
 });
 
+// DEBUG ENDPOINT - Get complete scoring breakdown for a member
+// TEMPORARY: Shows ALL candidates with detailed scores
+app.get('/api/debug/matches/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    console.log(`🐛 DEBUG: Analyzing all matches for ${memberId}`);
+
+    const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Check if embedding exists
+    let memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+
+    const debugInfo = {
+      member: {
+        id: member.member_id,
+        name: member.name,
+        org: member.org,
+        industry: member.industry,
+        city: member.city,
+        hasEmbedding: !!memberVector,
+        embeddingSize: memberVector ? JSON.parse(memberVector.embedding_ops).length : 0
+      },
+      candidates: [],
+      summary: {}
+    };
+
+    if (!memberVector) {
+      console.log('⚠️  No embedding found, generating...');
+      await generateEmbedding(memberId);
+      memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+      debugInfo.member.hasEmbedding = !!memberVector;
+      debugInfo.member.embeddingGenerated = true;
+    }
+
+    if (!memberVector) {
+      return res.json({
+        ...debugInfo,
+        error: 'Could not generate embedding'
+      });
+    }
+
+    const memberEmbedding = JSON.parse(memberVector.embedding_ops);
+
+    // Get ALL candidates
+    const candidates = await db.all(`
+      SELECT m.*, v.embedding_ops
+      FROM members m
+      JOIN vectors v ON m.member_id = v.member_id
+      WHERE m.member_id != $1 AND m.consent = true
+    `, [memberId]);
+
+    console.log(`🐛 Found ${candidates.length} candidates`);
+
+    // Score each one with detailed breakdown
+    const scored = candidates.map((candidate, idx) => {
+      try {
+        const candidateEmbedding = JSON.parse(candidate.embedding_ops);
+        const similarity = cosineSimilarity(memberEmbedding, candidateEmbedding);
+        const scoreData = calculateMatchScore(member, candidate, similarity);
+
+        return {
+          rank: idx + 1,
+          name: candidate.name,
+          org: candidate.org,
+          industry: candidate.industry,
+          city: candidate.city,
+          score: scoreData.score,
+          similarity: similarity.toFixed(4),
+          fullBreakdown: scoreData.fullBreakdown,
+          summary: scoreData.summary,
+          passesTop3Filter: scoreData.score > 0,
+          passesBrainstormFilter: scoreData.score >= 40
+        };
+      } catch (error) {
+        return {
+          rank: idx + 1,
+          name: candidate.name,
+          org: candidate.org,
+          error: error.message,
+          score: 0
+        };
+      }
+    });
+
+    // Sort by score
+    scored.sort((a, b) => b.score - a.score);
+
+    debugInfo.candidates = scored;
+    debugInfo.summary = {
+      totalCandidates: scored.length,
+      withScore: scored.filter(s => s.score > 0).length,
+      top3Eligible: scored.filter(s => s.score > 0).length,
+      brainstormEligible: scored.filter(s => s.score >= 40).length,
+      averageScore: (scored.reduce((sum, s) => sum + s.score, 0) / scored.length).toFixed(2),
+      averageSimilarity: (scored.reduce((sum, s) => sum + parseFloat(s.similarity || 0), 0) / scored.length).toFixed(4)
+    };
+
+    console.log(`🐛 Summary: ${debugInfo.summary.top3Eligible} eligible for top3, ${debugInfo.summary.brainstormEligible} for brainstorm`);
+
+    res.json(debugInfo);
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 // Helper functions
 function generateId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -607,11 +716,21 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     console.log(`✅ Scoring complete`);
 
     // Filter by threshold and sort (exclude self-matches)
-    const threshold = 40; // Minimum score threshold
+    const threshold = 20; // Minimum score threshold (lowered from 40 - was filtering out too many!)
     const filtered = scored.filter(c => c.score >= threshold);
     filtered.sort((a, b) => b.score - a.score);
     const brainstorm = filtered.slice(0, 20); // Limit to 20 for quality AI generation
 
+    // Log score distribution to understand what's happening
+    const scoreRanges = {
+      excellent: scored.filter(s => s.score >= 70).length,
+      good: scored.filter(s => s.score >= 50 && s.score < 70).length,
+      fair: scored.filter(s => s.score >= 30 && s.score < 50).length,
+      weak: scored.filter(s => s.score >= 20 && s.score < 30).length,
+      veryWeak: scored.filter(s => s.score > 0 && s.score < 20).length,
+      zero: scored.filter(s => s.score === 0).length
+    };
+    console.log(`📊 Score Distribution: 70+:${scoreRanges.excellent}, 50-69:${scoreRanges.good}, 30-49:${scoreRanges.fair}, 20-29:${scoreRanges.weak}, 1-19:${scoreRanges.veryWeak}, 0:${scoreRanges.zero}`);
     console.log(`📊 Brainstorm: ${scored.length} candidates, ${filtered.length} above threshold (${threshold} points), selected top ${brainstorm.length}`);
 
     // Generate AI rationales for brainstorm matches (using GPT-4o for maximum quality)
