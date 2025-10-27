@@ -614,14 +614,14 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
 
     console.log(`📊 Brainstorm: ${scored.length} candidates, ${filtered.length} above threshold (${threshold} points), selected top ${brainstorm.length}`);
 
-    // Generate AI rationales for brainstorm matches (using GPT-3.5 for speed/cost balance)
-    console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (this may take a minute)...`);
+    // Generate AI rationales for brainstorm matches (using GPT-4o for maximum quality)
+    console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (using GPT-4o - may take 1-3 minutes)...`);
     for (let i = 0; i < brainstorm.length; i++) {
       const match = brainstorm[i];
       console.log(`   [${i + 1}/${brainstorm.length}] Generating intro for ${member.name} → ${match.name}...`);
 
       try {
-        const rationale = await generateMatchRationale(member, match, false); // false = use GPT-3.5
+        const rationale = await generateMatchRationale(member, match, true); // true = use GPT-4o for quality
 
         // Ensure intro_basis is a string (handle if AI returns object)
         let introBasisString = rationale.intro_basis;
