@@ -1303,6 +1303,77 @@ app.get('/api/dashboard/stats', async (req, res) => {
   }
 });
 
+// Admin: Generate embeddings for all members who don't have them
+app.post('/api/admin/generate-all-embeddings', requireAuth, async (req, res) => {
+  try {
+    console.log('🔧 ADMIN: Generating embeddings for all members without embeddings...');
+
+    // Find all members who don't have embeddings
+    const membersWithoutEmbeddings = await db.all(`
+      SELECT m.member_id, m.name, m.org
+      FROM members m
+      LEFT JOIN vectors v ON m.member_id = v.member_id
+      WHERE v.member_id IS NULL
+    `);
+
+    console.log(`📊 Found ${membersWithoutEmbeddings.length} members without embeddings`);
+
+    if (membersWithoutEmbeddings.length === 0) {
+      return res.json({
+        success: true,
+        message: 'All members already have embeddings',
+        generated: 0,
+        total: 0
+      });
+    }
+
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    // Generate embeddings for each member
+    for (let i = 0; i < membersWithoutEmbeddings.length; i++) {
+      const member = membersWithoutEmbeddings[i];
+      console.log(`   [${i + 1}/${membersWithoutEmbeddings.length}] Generating embedding for ${member.name} (${member.org})...`);
+
+      try {
+        await generateEmbedding(member.member_id);
+        successCount++;
+        results.push({
+          member_id: member.member_id,
+          name: member.name,
+          status: 'success'
+        });
+        console.log(`      ✅ Success`);
+      } catch (error) {
+        failCount++;
+        results.push({
+          member_id: member.member_id,
+          name: member.name,
+          status: 'failed',
+          error: error.message
+        });
+        console.error(`      ❌ Failed: ${error.message}`);
+      }
+    }
+
+    console.log(`\n✅ Embedding generation complete: ${successCount} succeeded, ${failCount} failed`);
+
+    res.json({
+      success: true,
+      message: `Generated ${successCount} embeddings (${failCount} failed)`,
+      generated: successCount,
+      failed: failCount,
+      total: membersWithoutEmbeddings.length,
+      results
+    });
+
+  } catch (error) {
+    console.error('❌ Generate all embeddings error:', error);
+    res.status(500).json({ error: 'Failed to generate embeddings', details: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
