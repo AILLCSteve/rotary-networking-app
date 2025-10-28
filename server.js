@@ -626,6 +626,8 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       WHERE m.member_id != $1 AND m.consent = true
     `, [memberId]);
 
+    console.log(`📊 TOP3: Found ${candidates.length} candidates with embeddings (excluding self)`);
+
     // Calculate scores with error handling
     console.log(`⚙️  Calculating match scores for ${candidates.length} candidates...`);
     const scored = candidates.map((candidate, idx) => {
@@ -772,6 +774,8 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
       JOIN vectors v ON m.member_id = v.member_id
       WHERE m.member_id != $1 AND m.consent = true
     `, [memberId]);
+
+    console.log(`📊 BRAINSTORM: Found ${candidates.length} candidates with embeddings (excluding self)`);
 
     // Calculate scores with error handling
     console.log(`⚙️  Calculating match scores for ${candidates.length} candidates...`);
@@ -1310,6 +1314,64 @@ app.get('/api/dashboard/stats', async (req, res) => {
   } catch (error) {
     console.error('Dashboard stats error:', error);
     res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+// Diagnostic: Check embedding status
+app.get('/api/admin/embedding-status', async (req, res) => {
+  try {
+    const totalMembers = await db.get('SELECT COUNT(*)::int as count FROM members');
+    const membersWithEmbeddings = await db.get('SELECT COUNT(*)::int as count FROM vectors');
+    const totalIntros = await db.get('SELECT COUNT(*)::int as count FROM intros');
+    const membersWithoutEmbeddings = await db.all(`
+      SELECT m.member_id, m.name, m.org
+      FROM members m
+      LEFT JOIN vectors v ON m.member_id = v.member_id
+      WHERE v.member_id IS NULL
+    `);
+
+    res.json({
+      totalMembers: totalMembers.count,
+      withEmbeddings: membersWithEmbeddings.count,
+      withoutEmbeddings: membersWithoutEmbeddings.length,
+      totalIntros: totalIntros.count,
+      missingList: membersWithoutEmbeddings.map(m => ({ name: m.name, org: m.org, id: m.member_id }))
+    });
+  } catch (error) {
+    console.error('Embedding status check error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Reset all matches and clear caches
+app.post('/api/admin/reset-matches', async (req, res) => {
+  // Check authentication
+  if (!req.session.adminId) {
+    console.log('Reset matches request denied - not authenticated');
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  try {
+    console.log('🔧 ADMIN: Resetting all matches and clearing caches...');
+
+    // Delete all intros
+    await db.run('DELETE FROM intros');
+
+    const totalMembers = await db.get('SELECT COUNT(*)::int as count FROM members');
+    const totalEmbeddings = await db.get('SELECT COUNT(*)::int as count FROM vectors');
+
+    console.log(`✅ All matches reset. ${totalMembers.count} members remain with ${totalEmbeddings.count} embeddings`);
+
+    res.json({
+      success: true,
+      message: 'All matches and caches cleared',
+      membersRetained: totalMembers.count,
+      embeddingsRetained: totalEmbeddings.count
+    });
+
+  } catch (error) {
+    console.error('❌ Reset matches error:', error);
+    res.status(500).json({ error: 'Failed to reset matches', details: error.message });
   }
 });
 

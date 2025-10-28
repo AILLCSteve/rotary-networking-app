@@ -74,7 +74,20 @@
                 </div>
             </div>
 
-            <div class="action-buttons">
+            <div class="card" style="margin-top: 2rem; background: #f8f9ff; border: 2px solid #667eea;">
+                <h3 style="color: #667eea; margin-bottom: 1rem;">🔧 System Tools</h3>
+                <div id="systemStatus" style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; display: none;">
+                    <strong>System Status:</strong>
+                    <div id="statusContent" style="margin-top: 0.5rem;"></div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="generateEmbeddingsBtn">🤖 Generate All Embeddings</button>
+                    <button class="btn btn-secondary" id="checkStatusBtn">📊 Check System Status</button>
+                    <button class="btn btn-secondary" id="resetMatchesBtn" style="background: #ff9800; color: white;">🔄 Reset All Matches</button>
+                </div>
+            </div>
+
+            <div class="action-buttons" style="margin-top: 2rem;">
                 <a href="/dashboard.html" class="btn btn-secondary" target="_blank">Open Public Dashboard</a>
                 <button class="btn btn-secondary" id="refreshBtn">Refresh Data</button>
                 <button class="btn btn-secondary" id="deleteAllBtn" style="background: #f44336; color: white;">Delete All Members</button>
@@ -282,14 +295,148 @@
 
         // Refresh button
         document.getElementById('refreshBtn').addEventListener('click', loadMembers);
-        
+
+        // System Tools - Check Status
+        document.getElementById('checkStatusBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('checkStatusBtn');
+            const statusBox = document.getElementById('systemStatus');
+            const statusContent = document.getElementById('statusContent');
+
+            btn.disabled = true;
+            btn.textContent = 'Checking...';
+
+            try {
+                const response = await fetch('/api/admin/embedding-status');
+                const status = await response.json();
+
+                statusBox.style.display = 'block';
+                statusContent.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                        <div><strong>Total Members:</strong> ${status.totalMembers}</div>
+                        <div><strong>With Embeddings:</strong> ${status.withEmbeddings}</div>
+                        <div><strong>Missing Embeddings:</strong> ${status.withoutEmbeddings}</div>
+                        <div><strong>Total Matches Generated:</strong> ${status.totalIntros}</div>
+                    </div>
+                    ${status.withoutEmbeddings > 0 ? `
+                        <div style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border-radius: 6px;">
+                            <strong>⚠️ Missing Embeddings:</strong>
+                            <ul style="margin: 0.5rem 0 0 1.5rem;">
+                                ${status.missingList.map(m => `<li>${m.name} (${m.org})</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : '<div style="margin-top: 1rem; color: #10b981;"><strong>✅ All members have embeddings!</strong></div>'}
+                `;
+            } catch (error) {
+                statusContent.innerHTML = `<div style="color: #f44336;">Error: ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📊 Check System Status';
+            }
+        });
+
+        // System Tools - Generate Embeddings
+        document.getElementById('generateEmbeddingsBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('generateEmbeddingsBtn');
+            const statusBox = document.getElementById('systemStatus');
+            const statusContent = document.getElementById('statusContent');
+
+            if (!confirm('Generate embeddings for all members without embeddings? This uses OpenAI API.')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '🤖 Generating...';
+            statusBox.style.display = 'block';
+            statusContent.innerHTML = '<div style="color: #667eea;">⏳ Generating embeddings... This may take 30-60 seconds...</div>';
+
+            try {
+                const response = await fetch('/api/admin/generate-all-embeddings', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    statusContent.innerHTML = `
+                        <div style="color: #10b981; margin-bottom: 1rem;">
+                            <strong>✅ Success!</strong> Generated ${result.generated} embeddings
+                        </div>
+                        ${result.failed > 0 ? `<div style="color: #f44336;">Failed: ${result.failed}</div>` : ''}
+                        <div style="margin-top: 1rem;">
+                            <strong>Results:</strong>
+                            <ul style="margin: 0.5rem 0 0 1.5rem; max-height: 200px; overflow-y: auto;">
+                                ${result.results.map(r => `
+                                    <li>${r.status === 'success' ? '✅' : '❌'} ${r.name}</li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                    alert(`Successfully generated ${result.generated} embeddings!`);
+                } else {
+                    throw new Error(result.error || 'Failed to generate embeddings');
+                }
+            } catch (error) {
+                statusContent.innerHTML = `<div style="color: #f44336;">❌ Error: ${error.message}</div>`;
+                alert('Failed to generate embeddings: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🤖 Generate All Embeddings';
+            }
+        });
+
+        // System Tools - Reset Matches
+        document.getElementById('resetMatchesBtn').addEventListener('click', async () => {
+            if (!confirm('Reset ALL matches and clear caches? This will delete all generated introductions. Members and embeddings will be retained.')) {
+                return;
+            }
+
+            if (!confirm('Are you absolutely sure? This cannot be undone!')) {
+                return;
+            }
+
+            const btn = document.getElementById('resetMatchesBtn');
+            const statusBox = document.getElementById('systemStatus');
+            const statusContent = document.getElementById('statusContent');
+
+            btn.disabled = true;
+            btn.textContent = '🔄 Resetting...';
+            statusBox.style.display = 'block';
+            statusContent.innerHTML = '<div style="color: #ff9800;">⏳ Resetting all matches...</div>';
+
+            try {
+                const response = await fetch('/api/admin/reset-matches', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    statusContent.innerHTML = `
+                        <div style="color: #10b981;">
+                            <strong>✅ ${result.message}</strong><br>
+                            Members retained: ${result.membersRetained}<br>
+                            Embeddings retained: ${result.embeddingsRetained}
+                        </div>
+                    `;
+                    alert('All matches have been reset successfully!');
+                    loadMembers(); // Refresh to show updated stats
+                } else {
+                    throw new Error(result.error || 'Failed to reset matches');
+                }
+            } catch (error) {
+                statusContent.innerHTML = `<div style="color: #f44336;">❌ Error: ${error.message}</div>`;
+                alert('Failed to reset matches: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔄 Reset All Matches';
+            }
+        });
+
         // Auto-refresh every 10 seconds
         setInterval(() => {
             if (isAuthenticated) {
                 loadMembers();
             }
         }, 10000);
-        
+
         // Initial check
         checkAuth();
     </script>
