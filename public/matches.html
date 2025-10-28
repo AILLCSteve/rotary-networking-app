@@ -55,9 +55,8 @@
         <div id="introModal" class="modal hidden">
             <div class="modal-content">
                 <span class="close" id="closeModal">&times;</span>
-                <h3>Introduction Starter</h3>
                 <div id="modalContent"></div>
-                <button class="btn btn-primary" id="markAcknowledged">Mark as Introduced</button>
+                <button class="btn btn-primary" id="markAcknowledged" style="margin-top: 2rem;">✓ Mark as Introduced</button>
             </div>
         </div>
     </div>
@@ -164,19 +163,19 @@
                     <div class="match-rationale">
                         ${match.rationale_ops ? `
                             <div class="rationale-item">
-                                <strong>Ops Rationale:</strong>
+                                <strong>Why Connect:</strong>
                                 <p>${match.rationale_ops}</p>
                             </div>
                         ` : ''}
                         ${match.creative_angle ? `
                             <div class="rationale-item">
-                                <strong>Creative Angle:</strong>
+                                <strong>Unique Opportunity:</strong>
                                 <p>${match.creative_angle}</p>
                             </div>
                         ` : ''}
                     </div>
                     <button class="btn btn-small intro-btn" data-intro-id="${match.intro_id}">
-                        View Introduction Starter
+                        View Conversation Starters →
                     </button>
                 </div>
             `;
@@ -210,17 +209,62 @@
         function showIntro(introId, introBasis) {
             currentIntroId = introId;
 
-            // Handle if introBasis is an object or string
-            let displayText = introBasis;
-            if (typeof introBasis === 'object') {
-                // If it's an object, stringify it nicely or extract text
-                displayText = JSON.stringify(introBasis, null, 2);
+            // Parse and format the intro content
+            let formattedHTML = '';
+
+            try {
+                // introBasis contains numbered conversation approaches
+                // Clean up any JSON-like formatting
+                let cleanText = introBasis;
+
+                if (typeof introBasis === 'object') {
+                    cleanText = JSON.stringify(introBasis, null, 2);
+                }
+
+                // Remove JSON-like key/value formatting
+                cleanText = cleanText.replace(/"(\w+)":\s*/g, ''); // Remove "key":
+                cleanText = cleanText.replace(/[\{\}]/g, ''); // Remove braces
+                cleanText = cleanText.replace(/^,/gm, ''); // Remove leading commas
+
+                // Split by numbered approaches (Approach #1, Approach #2, Approach #3)
+                const approaches = cleanText.split(/(Approach #\d+:)/);
+
+                // Build formatted HTML
+                let approachNumber = 0;
+                formattedHTML = '<div class="intro-content">';
+                formattedHTML += '<h4 style="margin-bottom: 1rem; color: #667eea;">💡 Conversation Starters</h4>';
+
+                for (let i = 0; i < approaches.length; i++) {
+                    const part = approaches[i].trim();
+                    if (!part) continue;
+
+                    if (part.match(/Approach #\d+:/)) {
+                        approachNumber++;
+                        formattedHTML += `<div class="approach-item" style="margin-bottom: 1.5rem;">`;
+                        formattedHTML += `<div class="approach-number" style="background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; margin-bottom: 0.5rem;">${approachNumber}</div>`;
+                    } else {
+                        // Clean up the approach text
+                        let cleanedApproach = part
+                            .replace(/^\s*"/, '') // Remove leading quote
+                            .replace(/"\s*$/, '') // Remove trailing quote
+                            .replace(/\\"/g, '"') // Unescape quotes
+                            .replace(/\n\n+/g, '\n') // Remove extra newlines
+                            .trim();
+
+                        formattedHTML += `<p style="line-height: 1.6; color: #333; margin-left: 0.5rem;">${cleanedApproach}</p>`;
+                        formattedHTML += `</div>`;
+                    }
+                }
+
+                formattedHTML += '</div>';
+
+            } catch (error) {
+                console.error('Error formatting intro:', error);
+                // Fallback to simple display
+                formattedHTML = `<div style="white-space: pre-wrap; line-height: 1.6;">${introBasis}</div>`;
             }
 
-            // Replace newlines with <br> for better formatting
-            displayText = displayText.replace(/\n/g, '<br>');
-
-            document.getElementById('modalContent').innerHTML = `<div style="white-space: pre-wrap;">${displayText}</div>`;
+            document.getElementById('modalContent').innerHTML = formattedHTML;
             document.getElementById('introModal').classList.remove('hidden');
         }
         

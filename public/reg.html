@@ -5,6 +5,195 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rotary Networking - Register</title>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .wizard-container {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .wizard-progress {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .wizard-progress::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e5e7eb;
+            z-index: -1;
+        }
+
+        .wizard-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+        }
+
+        .wizard-step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .wizard-step.active .wizard-step-circle {
+            background: #667eea;
+            color: white;
+        }
+
+        .wizard-step.completed .wizard-step-circle {
+            background: #10b981;
+            color: white;
+        }
+
+        .wizard-step-label {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            text-align: center;
+        }
+
+        .wizard-step.active .wizard-step-label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .wizard-content {
+            min-height: 350px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .wizard-question {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .wizard-question.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .question-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .question-subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+
+        .wizard-input {
+            font-size: 1.1rem;
+            padding: 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .wizard-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .wizard-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+            gap: 1rem;
+        }
+
+        .btn-wizard {
+            padding: 0.75rem 2rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-back {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .btn-back:hover {
+            background: #e5e7eb;
+        }
+
+        .btn-next {
+            background: #667eea;
+            color: white;
+            flex: 1;
+        }
+
+        .btn-next:hover {
+            background: #5568d3;
+        }
+
+        .btn-next:disabled {
+            background: #e5e7eb;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .hint-text {
+            font-size: 0.9rem;
+            color: #9ca3af;
+            margin-top: 0.5rem;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: #f8f9ff;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper label {
+            cursor: pointer;
+            font-size: 1rem;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -13,83 +202,97 @@
             <p class="subtitle">AI-Powered Connection Matching</p>
         </div>
 
-        <div class="card" id="registerCard">
-            <h2>Register for Smart Networking</h2>
-            <p class="info">Fill out your profile to get matched with complementary businesses</p>
-            
-            <form id="registerForm">
-                <div class="form-section">
-                    <h3>Basic Information</h3>
-                    
-                    <div class="form-group">
-                        <label for="name">Your Name *</label>
-                        <input type="text" id="name" name="name" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="org">Organization *</label>
-                        <input type="text" id="org" name="org" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="role">Your Role *</label>
-                        <input type="text" id="role" name="role" placeholder="e.g., CEO, Sales Director, Owner" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="industry">Industry *</label>
-                        <input type="text" id="industry" name="industry" placeholder="e.g., Healthcare, Manufacturing, Tech" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="city">City *</label>
-                        <input type="text" id="city" name="city" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email">Email (optional - for backup access)</label>
-                        <input type="email" id="email" name="email">
+        <div class="card wizard-container" id="registerCard">
+            <!-- Progress Indicator -->
+            <div class="wizard-progress">
+                <div class="wizard-step active" data-step="1">
+                    <div class="wizard-step-circle">1</div>
+                    <div class="wizard-step-label">About You</div>
+                </div>
+                <div class="wizard-step" data-step="2">
+                    <div class="wizard-step-circle">2</div>
+                    <div class="wizard-step-label">Your Business</div>
+                </div>
+                <div class="wizard-step" data-step="3">
+                    <div class="wizard-step-circle">3</div>
+                    <div class="wizard-step-label">What You Offer</div>
+                </div>
+                <div class="wizard-step" data-step="4">
+                    <div class="wizard-step-circle">4</div>
+                    <div class="wizard-step-label">What You Need</div>
+                </div>
+                <div class="wizard-step" data-step="5">
+                    <div class="wizard-step-circle">5</div>
+                    <div class="wizard-step-label">Finish</div>
+                </div>
+            </div>
+
+            <!-- Wizard Content -->
+            <div class="wizard-content">
+                <!-- Question 1: Name -->
+                <div class="wizard-question active" data-question="1">
+                    <div class="question-title">What's your name?</div>
+                    <div class="question-subtitle">Let's start with the basics</div>
+                    <input type="text" class="wizard-input" id="name" placeholder="Your full name" autofocus>
+                </div>
+
+                <!-- Question 2: Organization & Role -->
+                <div class="wizard-question" data-question="2">
+                    <div class="question-title">Tell us about your organization</div>
+                    <div class="question-subtitle">Where do you work?</div>
+                    <input type="text" class="wizard-input" id="org" placeholder="Company or organization name" style="margin-bottom: 1rem;">
+                    <input type="text" class="wizard-input" id="role" placeholder="Your role (CEO, Sales Director, Owner, etc.)">
+                </div>
+
+                <!-- Question 3: Industry & Location -->
+                <div class="wizard-question" data-question="3">
+                    <div class="question-title">Where are you based?</div>
+                    <div class="question-subtitle">Industry and location help us find local synergies</div>
+                    <input type="text" class="wizard-input" id="industry" placeholder="Your industry (Tech, Healthcare, Manufacturing, etc.)" style="margin-bottom: 1rem;">
+                    <input type="text" class="wizard-input" id="city" placeholder="City">
+                </div>
+
+                <!-- Question 4: Revenue Driver & Challenge -->
+                <div class="wizard-question" data-question="4">
+                    <div class="question-title">What drives your business?</div>
+                    <div class="question-subtitle">Tell us how you make money and what challenges you face</div>
+                    <textarea class="wizard-input wizard-textarea" id="rev_driver" placeholder="How do you generate revenue? (e.g., software subscriptions, retail sales, consulting services)"></textarea>
+                    <div style="height: 1rem;"></div>
+                    <textarea class="wizard-input wizard-textarea" id="current_constraint" placeholder="What's your biggest challenge right now? (e.g., finding customers, hiring talent, raising capital)"></textarea>
+                </div>
+
+                <!-- Question 5: Assets & Needs -->
+                <div class="wizard-question" data-question="5">
+                    <div class="question-title">What can you offer and what do you need?</div>
+                    <div class="question-subtitle">This helps us find perfect collaboration opportunities</div>
+                    <textarea class="wizard-input wizard-textarea" id="assets" placeholder="What strengths or resources do you have?&#10;(e.g., large customer base, technical expertise, event space, strong brand)"></textarea>
+                    <div class="hint-text">💡 List them naturally - we'll understand bullets, commas, or line breaks</div>
+                    <div style="height: 1rem;"></div>
+                    <textarea class="wizard-input wizard-textarea" id="needs" placeholder="What help are you looking for?&#10;(e.g., marketing support, strategic partnerships, distribution channels)"></textarea>
+                    <div class="hint-text">💡 Be specific about what would help your business grow</div>
+                </div>
+
+                <!-- Question 6: Fun Fact & Consent -->
+                <div class="wizard-question" data-question="6">
+                    <div class="question-title">Almost done! 🎉</div>
+                    <div class="question-subtitle">One last thing to make you memorable</div>
+                    <input type="text" class="wizard-input" id="fun_fact" placeholder="Share something interesting about you or your business" style="margin-bottom: 1rem;">
+                    <div class="hint-text" style="margin-bottom: 1.5rem;">💡 e.g., "Started in my garage" or "We've served 10,000 customers"</div>
+
+                    <input type="email" class="wizard-input" id="email" placeholder="Email (optional - for backup access)" style="margin-bottom: 1.5rem;">
+
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="consent" checked>
+                        <label for="consent">I agree to participate in the networking matching system</label>
                     </div>
                 </div>
-                
-                <div class="form-section">
-                    <h3>Business Profile</h3>
-                    
-                    <div class="form-group">
-                        <label for="rev_driver">What drives your revenue?</label>
-                        <textarea id="rev_driver" name="rev_driver" rows="2" placeholder="e.g., B2B software sales, retail foot traffic, subscription services"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="current_constraint">Current biggest constraint/challenge?</label>
-                        <textarea id="current_constraint" name="current_constraint" rows="2" placeholder="e.g., Lead generation, talent acquisition, supply chain"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="assets">What assets/strengths do you have? (comma-separated)</label>
-                        <textarea id="assets" name="assets" rows="2" placeholder="e.g., large email list, event space, technical expertise, strong brand"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="needs">What do you need help with? (comma-separated)</label>
-                        <textarea id="needs" name="needs" rows="2" placeholder="e.g., marketing, distribution, funding, partnerships"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="fun_fact">Fun fact about you or your business</label>
-                        <input type="text" id="fun_fact" name="fun_fact" placeholder="e.g., We have a office dog named Revenue">
-                    </div>
-                </div>
-                
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" id="consent" name="consent" checked required>
-                        I agree to participate in the networking matching system
-                    </label>
-                </div>
-                
-                <button type="submit" class="btn btn-primary">Register & See My Matches</button>
-            </form>
+            </div>
+
+            <!-- Navigation -->
+            <div class="wizard-nav">
+                <button type="button" class="btn-wizard btn-back" id="btnBack" style="display: none;">← Back</button>
+                <button type="button" class="btn-wizard btn-next" id="btnNext">Next →</button>
+            </div>
         </div>
 
         <div class="card hidden" id="successCard">
@@ -105,49 +308,180 @@
     </div>
 
     <script>
-        const form = document.getElementById('registerForm');
-        const registerCard = document.getElementById('registerCard');
-        const successCard = document.getElementById('successCard');
-        
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData);
-            data.consent = document.getElementById('consent').checked;
-            
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    const matchesUrl = `${window.location.origin}/matches.html?id=${result.memberId}`;
-                    
-                    document.getElementById('memberIdDisplay').textContent = result.memberId;
-                    document.getElementById('linkBox').innerHTML = `<a href="${matchesUrl}">${matchesUrl}</a>`;
-                    
-                    registerCard.classList.add('hidden');
-                    successCard.classList.remove('hidden');
-                    
-                    document.getElementById('goToMatches').onclick = () => {
-                        window.location.href = matchesUrl;
-                    };
-                    
-                    // Auto-redirect after 5 seconds
-                    setTimeout(() => {
-                        window.location.href = matchesUrl;
-                    }, 5000);
+        let currentStep = 1;
+        const totalSteps = 6;
+        const formData = {};
+
+        const btnNext = document.getElementById('btnNext');
+        const btnBack = document.getElementById('btnBack');
+
+        // Smart parsing for comma-separated or line-break separated lists
+        function parseList(text) {
+            if (!text) return '';
+            // Replace line breaks with commas
+            let cleaned = text.replace(/[\r\n]+/g, ', ');
+            // Replace bullet points with nothing
+            cleaned = cleaned.replace(/[•\-\*]\s*/g, '');
+            // Remove multiple consecutive commas
+            cleaned = cleaned.replace(/,\s*,+/g, ',');
+            // Trim and return
+            return cleaned.trim();
+        }
+
+        function updateProgress() {
+            document.querySelectorAll('.wizard-step').forEach((step, index) => {
+                const stepNum = index + 1;
+                if (stepNum < currentStep) {
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                } else if (stepNum === currentStep) {
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                } else {
+                    step.classList.remove('active', 'completed');
                 }
-            } catch (error) {
-                alert('Registration failed. Please try again.');
-                console.error(error);
+            });
+        }
+
+        function showQuestion(step) {
+            document.querySelectorAll('.wizard-question').forEach(q => {
+                q.classList.remove('active');
+            });
+            document.querySelector(`.wizard-question[data-question="${step}"]`).classList.add('active');
+
+            // Focus first input in current question
+            setTimeout(() => {
+                const activeQuestion = document.querySelector(`.wizard-question[data-question="${step}"]`);
+                const firstInput = activeQuestion.querySelector('input, textarea');
+                if (firstInput) firstInput.focus();
+            }, 100);
+        }
+
+        function validateCurrentStep() {
+            if (currentStep === 1) {
+                const name = document.getElementById('name').value.trim();
+                return name.length > 0;
+            } else if (currentStep === 2) {
+                const org = document.getElementById('org').value.trim();
+                const role = document.getElementById('role').value.trim();
+                return org.length > 0 && role.length > 0;
+            } else if (currentStep === 3) {
+                const industry = document.getElementById('industry').value.trim();
+                const city = document.getElementById('city').value.trim();
+                return industry.length > 0 && city.length > 0;
+            } else if (currentStep === 6) {
+                return document.getElementById('consent').checked;
+            }
+            return true; // Steps 4, 5 are optional
+        }
+
+        function saveCurrentStep() {
+            if (currentStep === 1) {
+                formData.name = document.getElementById('name').value.trim();
+            } else if (currentStep === 2) {
+                formData.org = document.getElementById('org').value.trim();
+                formData.role = document.getElementById('role').value.trim();
+            } else if (currentStep === 3) {
+                formData.industry = document.getElementById('industry').value.trim();
+                formData.city = document.getElementById('city').value.trim();
+            } else if (currentStep === 4) {
+                formData.rev_driver = document.getElementById('rev_driver').value.trim();
+                formData.current_constraint = document.getElementById('current_constraint').value.trim();
+            } else if (currentStep === 5) {
+                formData.assets = parseList(document.getElementById('assets').value);
+                formData.needs = parseList(document.getElementById('needs').value);
+            } else if (currentStep === 6) {
+                formData.fun_fact = document.getElementById('fun_fact').value.trim();
+                formData.email = document.getElementById('email').value.trim();
+                formData.consent = document.getElementById('consent').checked;
+            }
+        }
+
+        function updateButtonState() {
+            const isValid = validateCurrentStep();
+            btnNext.disabled = !isValid;
+            btnNext.textContent = currentStep === totalSteps ? '✓ Register' : 'Next →';
+            btnBack.style.display = currentStep === 1 ? 'none' : 'block';
+        }
+
+        // Real-time validation
+        document.querySelectorAll('.wizard-input').forEach(input => {
+            input.addEventListener('input', updateButtonState);
+        });
+        document.getElementById('consent').addEventListener('change', updateButtonState);
+
+        btnNext.addEventListener('click', async () => {
+            if (!validateCurrentStep()) return;
+
+            saveCurrentStep();
+
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateProgress();
+                showQuestion(currentStep);
+                updateButtonState();
+            } else {
+                // Submit form
+                btnNext.disabled = true;
+                btnNext.textContent = '⏳ Creating your profile...';
+
+                try {
+                    const response = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        const matchesUrl = `${window.location.origin}/matches.html?id=${result.memberId}`;
+
+                        document.getElementById('memberIdDisplay').textContent = result.memberId;
+                        document.getElementById('linkBox').innerHTML = `<a href="${matchesUrl}">${matchesUrl}</a>`;
+
+                        document.getElementById('registerCard').classList.add('hidden');
+                        document.getElementById('successCard').classList.remove('hidden');
+
+                        document.getElementById('goToMatches').onclick = () => {
+                            window.location.href = matchesUrl;
+                        };
+
+                        // Auto-redirect after 5 seconds
+                        setTimeout(() => {
+                            window.location.href = matchesUrl;
+                        }, 5000);
+                    }
+                } catch (error) {
+                    alert('Registration failed. Please try again.');
+                    console.error(error);
+                    btnNext.disabled = false;
+                    btnNext.textContent = '✓ Register';
+                }
             }
         });
+
+        btnBack.addEventListener('click', () => {
+            if (currentStep > 1) {
+                currentStep--;
+                updateProgress();
+                showQuestion(currentStep);
+                updateButtonState();
+            }
+        });
+
+        // Allow Enter key to advance (except in textareas)
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                if (!btnNext.disabled) {
+                    btnNext.click();
+                }
+            }
+        });
+
+        // Initialize
+        updateButtonState();
     </script>
 </body>
 </html>
