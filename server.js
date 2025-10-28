@@ -810,7 +810,17 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     // NO THRESHOLD - every business professional has networking potential
     const filtered = scored.filter(c => c.score > 0); // Only removes self-matches and errors
     filtered.sort((a, b) => b.score - a.score);
-    const brainstorm = filtered; // Return ALL matches for comprehensive brainstorming
+
+    // EXCLUDE TOP 3 from brainstorm - they're already shown separately
+    // Get existing top 3 member IDs to avoid duplicates
+    const existingTop3 = await db.all(`
+      SELECT to_member_id FROM intros
+      WHERE for_member_id = $1 AND tier = 'top3'
+    `, [memberId]);
+    const top3MemberIds = new Set(existingTop3.map(i => i.to_member_id));
+
+    // Brainstorm = everyone except top 3
+    const brainstorm = filtered.filter(m => !top3MemberIds.has(m.member_id));
 
     // Log score distribution to understand quality range
     const scoreRanges = {
