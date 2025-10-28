@@ -1304,7 +1304,13 @@ app.get('/api/dashboard/stats', async (req, res) => {
 });
 
 // Admin: Generate embeddings for all members who don't have them
-app.post('/api/admin/generate-all-embeddings', requireAuth, async (req, res) => {
+app.post('/api/admin/generate-all-embeddings', async (req, res) => {
+  // Check authentication
+  if (!req.session.adminId) {
+    console.log('Generate embeddings request denied - not authenticated');
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
   try {
     console.log('🔧 ADMIN: Generating embeddings for all members without embeddings...');
 
