@@ -123,8 +123,15 @@
                                     ${summary ? `<span class="grade-badge grade-${summary.grade.replace('+', 'plus')}">${summary.grade}</span>` : ''}
                                 </div>
                                 <div class="breakdown-details">
-                                    ${breakdown.map(item => {
+                                    ${breakdown.map((item, idx) => {
                                         const percentage = item.maxPoints > 0 ? (item.points / item.maxPoints) * 100 : 0;
+
+                                        // Check if this is the Complementary Value category with creative ideas
+                                        const isComplementaryValue = item.factor === 'Complementary Value Exchange';
+                                        const hasCreativeIdeas = isComplementaryValue && scoreData.complementaryValueResearch?.creative_collaboration_ideas;
+                                        const creativeIdeas = hasCreativeIdeas ? scoreData.complementaryValueResearch.creative_collaboration_ideas : [];
+                                        const ideasCount = Array.isArray(creativeIdeas) ? creativeIdeas.length : 0;
+
                                         return `
                                         <div class="breakdown-item">
                                             <div class="breakdown-header">
@@ -135,6 +142,23 @@
                                                 <div class="progress-fill" style="width: ${percentage}%"></div>
                                             </div>
                                             ${item.description ? `<div class="factor-description">${item.description}</div>` : ''}
+                                            ${hasCreativeIdeas && ideasCount > 0 ? `
+                                                <button class="btn-toggle-ideas" onclick="toggleCreativeIdeas(event, ${idx})">
+                                                    💡 View ${ideasCount} Creative Collaboration Idea${ideasCount > 1 ? 's' : ''} →
+                                                </button>
+                                                <div class="creative-ideas-list" id="ideas-${idx}" style="display: none;">
+                                                    ${creativeIdeas.map((idea, i) => {
+                                                        // Clean up the idea text (remove dictionary keys like "1:", "2:", etc)
+                                                        const cleanIdea = typeof idea === 'string'
+                                                            ? idea.replace(/^["']?\d+["']?\s*:\s*/, '').replace(/^["']|["']$/g, '').trim()
+                                                            : JSON.stringify(idea);
+                                                        return `<div class="idea-item">
+                                                            <span class="idea-number">${i + 1}</span>
+                                                            <span class="idea-text">${cleanIdea}</span>
+                                                        </div>`;
+                                                    }).join('')}
+                                                </div>
+                                            ` : ''}
                                         </div>
                                         `;
                                     }).join('')}
@@ -433,6 +457,23 @@
         // Initial load
         loadDashboard();
         
+        // Toggle creative collaboration ideas display
+        function toggleCreativeIdeas(event, idx) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const button = event.target;
+            const ideasList = button.nextElementSibling;
+
+            if (ideasList.style.display === 'none') {
+                ideasList.style.display = 'block';
+                button.textContent = button.textContent.replace('View', 'Hide').replace('→', '▼');
+            } else {
+                ideasList.style.display = 'none';
+                button.textContent = button.textContent.replace('Hide', 'View').replace('▼', '→');
+            }
+        }
+
         // Auto-refresh every 30 seconds
         setInterval(loadDashboard, 30000);
     </script>

@@ -678,6 +678,83 @@ tr:hover {
     transition: width 0.3s ease;
 }
 
+/* Creative Collaboration Ideas Button & List */
+.btn-toggle-ideas {
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.btn-toggle-ideas:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-toggle-ideas:active {
+    transform: translateY(0);
+}
+
+.creative-ideas-list {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+    border-left: 3px solid #667eea;
+    border-radius: 6px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.idea-item {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    align-items: flex-start;
+}
+
+.idea-item:last-child {
+    margin-bottom: 0;
+}
+
+.idea-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    background: #667eea;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.idea-text {
+    flex: 1;
+    color: #333;
+    line-height: 1.5;
+    padding-top: 2px;
+}
+
 @media (max-width: 768px) {
     .breakdown-list li {
         grid-template-columns: 1fr;
@@ -692,5 +769,14 @@ tr:hover {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.25rem;
+    }
+
+    .btn-toggle-ideas {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .idea-item {
+        gap: 0.5rem;
     }
 }

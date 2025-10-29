@@ -1513,7 +1513,50 @@ REMEMBER: Your goal is to bring IDEAS to the table. Even if direct asset-need ma
     )
   ]);
 
-  return JSON.parse(response.choices[0].message.content);
+  const rawResult = JSON.parse(response.choices[0].message.content);
+
+  // CLEAN UP AI RESPONSE: Convert dictionary-style arrays to proper arrays
+  // Sometimes AI returns {"1": "idea 1", "2": "idea 2"} instead of ["idea 1", "idea 2"]
+  function cleanArrayField(field) {
+    if (!field) return [];
+    if (Array.isArray(field)) return field;
+
+    // Check if it's a dictionary with numeric keys
+    if (typeof field === 'object') {
+      const keys = Object.keys(field);
+      const allNumeric = keys.every(k => !isNaN(parseInt(k)));
+
+      if (allNumeric) {
+        // Convert {"1": "val", "2": "val"} to ["val", "val"]
+        return keys.sort((a, b) => parseInt(a) - parseInt(b)).map(k => field[k]);
+      }
+
+      // If it's an object but not numeric keys, return as single-item array
+      return [JSON.stringify(field)];
+    }
+
+    // If it's a string, return as single-item array
+    if (typeof field === 'string' && field.trim()) {
+      return [field];
+    }
+
+    return [];
+  }
+
+  // Clean all array fields
+  const cleanResult = {
+    ...rawResult,
+    creative_collaboration_ideas: cleanArrayField(rawResult.creative_collaboration_ideas),
+    top_3_opportunities: cleanArrayField(rawResult.top_3_opportunities),
+    direct_matches: rawResult.direct_matches, // Keep as-is (might be string or array)
+    constraint_solutions: rawResult.constraint_solutions,
+    latent_assets: rawResult.latent_assets,
+    network_value: rawResult.network_value,
+    value_rating: rawResult.value_rating,
+    red_flags: rawResult.red_flags
+  };
+
+  return cleanResult;
 }
 
 // STAGE 3: Strategic Match Synthesis & Introduction Generation
