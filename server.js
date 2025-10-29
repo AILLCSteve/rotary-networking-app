@@ -1168,8 +1168,8 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     console.log(`📊 Score Distribution: 75+:${scoreRanges.excellent}, 60-74:${scoreRanges.strong}, 50-59:${scoreRanges.good}, 40-49:${scoreRanges.moderate}, 30-39:${scoreRanges.baseline}, 1-29:${scoreRanges.low}, 0:${scoreRanges.zero}`);
     console.log(`📊 Brainstorm: ${scored.length} total candidates, ${filtered.length} valid matches (all included - no filtering)`);
 
-    // Generate AI rationales for brainstorm matches (using GPT-4o with 4-stage research)
-    console.log(`🤖 Generating AI intros with 4-stage research for ${brainstorm.length} brainstorm matches (may take 2-4 minutes)...`);
+    // Generate AI rationales for brainstorm matches (using GPT-4o with 5-stage research including fact-checking)
+    console.log(`🤖 Generating AI intros with 5-stage research (with fact-checking) for ${brainstorm.length} brainstorm matches (may take 2-5 minutes)...`);
     for (let i = 0; i < brainstorm.length; i++) {
       const match = brainstorm[i];
       console.log(`   [${i + 1}/${brainstorm.length}] Generating intro for ${member.name} → ${match.name}...`);
@@ -1559,7 +1559,179 @@ REMEMBER: Your goal is to bring IDEAS to the table. Even if direct asset-need ma
   return cleanResult;
 }
 
-// STAGE 3: Strategic Match Synthesis & Introduction Generation
+// STAGE 4: Fact-Checking & Claim Verification
+async function factCheckSynthesis(synthesisResult, member1, member2, complementaryValueResearch, industryResearch, companyResearch) {
+  try {
+    console.log(`   🔍 STAGE 4: Fact-checking synthesis for unsubstantiated claims...`);
+
+    const systemPrompt = `You are a RIGOROUS FACT-CHECKER for business networking content. Your job is to ensure all factual claims are substantiated by the provided research data.
+
+**YOUR VERIFICATION PROCESS:**
+
+1. **Identify Factual Claims vs Opinions/Suggestions**
+   - FACTUAL CLAIMS: Specific numbers, achievements, company details, trend assertions, historical events
+     Examples: "raised $5M", "appeared on Shark Tank", "AI adoption increased 40% in 2024", "reduced costs by 30%"
+   - OPINIONS/SUGGESTIONS: Strategic recommendations, potential opportunities, conversation approaches
+     Examples: "you could partner on...", "this might create value by...", "consider approaching with..."
+   - RULE: Flag factual claims that need verification. DO NOT flag opinions or suggestions.
+
+2. **Verification Standards**
+   - VERIFIED: Claim is explicitly stated in research data (member profiles, fun facts, or research stages)
+   - REASONABLE INFERENCE: Claim logically follows from provided data (mark it as inference, keep it)
+   - UNSUBSTANTIATED: Claim has no basis in research data (MUST be removed or softened)
+
+3. **What to Flag as UNSUBSTANTIATED:**
+   ❌ Specific numbers/metrics not in research (e.g., "grew 300%" when profile doesn't mention it)
+   ❌ Awards/achievements not mentioned in profiles or research
+   ❌ Definitive trend statements without Stage 1 research backing
+   ❌ Company details not provided in profiles (e.g., "100 employees" when not stated)
+   ❌ Media appearances not mentioned in fun facts or research
+   ❌ Specific partnerships/clients not disclosed in profiles
+   ❌ Market position claims without research backing ("industry leader", "fastest growing")
+
+4. **What to KEEP as-is:**
+   ✅ Claims directly from member profiles (name, role, org, industry, location, constraint, assets, needs, fun_fact)
+   ✅ Claims explicitly in research data (Stages 0, 1, 2 research findings)
+   ✅ Strategic suggestions and potential opportunities ("you could...", "consider...", "might...")
+   ✅ Reasonable inferences clearly marked as such ("based on their role as CEO, they likely...")
+   ✅ General industry knowledge that's common and non-controversial
+
+**YOUR OUTPUT:**
+Return JSON with:
+{
+  "rationale_ops": "Fact-checked version with unsubstantiated claims removed/softened",
+  "creative_angle": "Fact-checked version with unsubstantiated claims removed/softened",
+  "intro_basis": "Fact-checked version with unsubstantiated claims removed/softened",
+  "verification_log": [
+    {"claim": "specific claim text", "status": "VERIFIED|INFERENCE|REMOVED", "reason": "why"},
+    ...
+  ]
+}
+
+**CRITICAL RULES:**
+- Be STRICT: If a factual claim isn't in the research data, remove it or soften it to inference
+- Preserve the strategic value and tone - don't make it bland, just accurate
+- When removing unsubstantiated claims, replace with general strategic value or remove the sentence
+- Mark inferences appropriately: "Based on X, it's reasonable to infer Y" or "Given their role, they likely..."
+- Keep all suggestions, recommendations, and "you could..." statements - those don't need verification
+- Your job is to catch false claims while preserving strategic insights`;
+
+    const userPrompt = `Review this networking synthesis for unsubstantiated factual claims. Cross-reference every factual assertion against the research data below.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 SYNTHESIS TO FACT-CHECK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Strategic Rationale:**
+${synthesisResult.rationale_ops}
+
+**Creative Collaboration Angle:**
+${synthesisResult.creative_angle}
+
+**Conversation Approaches:**
+${synthesisResult.intro_basis}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ VERIFIED SOURCE DATA - This is ALL the data you can reference
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**${member1.name}'s Profile:**
+- Role: ${member1.role}
+- Organization: ${member1.org}
+- Industry: ${member1.industry}
+- Location: ${member1.city}
+- Revenue Model: ${member1.rev_driver || 'Not disclosed'}
+- Current Challenge: ${member1.current_constraint || 'Not disclosed'}
+- Assets: ${member1.assets || 'Not disclosed'}
+- Needs: ${member1.needs || 'Not disclosed'}
+- Fun Fact: ${member1.fun_fact || 'Not disclosed'}
+
+**${member2.name}'s Profile:**
+- Role: ${member2.role}
+- Organization: ${member2.org}
+- Industry: ${member2.industry}
+- Location: ${member2.city}
+- Revenue Model: ${member2.rev_driver || 'Not disclosed'}
+- Current Challenge: ${member2.current_constraint || 'Not disclosed'}
+- Assets: ${member2.assets || 'Not disclosed'}
+- Needs: ${member2.needs || 'Not disclosed'}
+- Fun Fact: ${member2.fun_fact || 'Not disclosed'}
+
+**Stage 0 Research (Complementary Value):**
+${JSON.stringify(complementaryValueResearch, null, 2)}
+
+**Stage 1 Research (Industry Context):**
+${JSON.stringify(industryResearch, null, 2)}
+
+**Stage 2 Research (Company/Individual):**
+${JSON.stringify(companyResearch, null, 2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**TASK:** Identify and remove/soften any factual claims in the synthesis that aren't substantiated by the source data above. Keep strategic suggestions and opinions. Return the fact-checked version.`;
+
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3, // Lower temperature for accurate fact-checking
+        max_tokens: 3500, // Enough for cleaned content + verification log
+        response_format: { type: 'json_object' }
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Fact-checking timeout after 60 seconds')), 60000)
+      )
+    ]);
+
+    const factCheckedResult = JSON.parse(response.choices[0].message.content);
+
+    // Log verification results
+    if (factCheckedResult.verification_log && factCheckedResult.verification_log.length > 0) {
+      const removedCount = factCheckedResult.verification_log.filter(v => v.status === 'REMOVED').length;
+      const inferenceCount = factCheckedResult.verification_log.filter(v => v.status === 'INFERENCE').length;
+
+      if (removedCount > 0 || inferenceCount > 0) {
+        console.log(`   ⚠️  Fact-check findings: ${removedCount} claims removed, ${inferenceCount} marked as inference`);
+
+        // Log specific removed claims for debugging
+        const removed = factCheckedResult.verification_log.filter(v => v.status === 'REMOVED');
+        removed.forEach(claim => {
+          console.log(`      └─ REMOVED: "${claim.claim}" - ${claim.reason}`);
+        });
+      } else {
+        console.log(`   ✅ Fact-check passed: All claims verified`);
+      }
+    }
+
+    console.log(`   ✅ STAGE 4 complete: Synthesis fact-checked and verified`);
+
+    return {
+      rationale_ops: factCheckedResult.rationale_ops,
+      creative_angle: factCheckedResult.creative_angle,
+      intro_basis: factCheckedResult.intro_basis,
+      verification_log: factCheckedResult.verification_log || []
+    };
+
+  } catch (error) {
+    console.error(`   ⚠️  STAGE 4 (Fact-checking) failed:`, error.message);
+    console.log(`   🔄 Continuing with unverified synthesis (fact-checking is non-blocking)`);
+
+    // Return original synthesis if fact-checking fails (non-blocking)
+    return {
+      rationale_ops: synthesisResult.rationale_ops,
+      creative_angle: synthesisResult.creative_angle,
+      intro_basis: synthesisResult.intro_basis,
+      verification_log: [{ claim: 'Fact-checking failed', status: 'ERROR', reason: error.message }]
+    };
+  }
+}
+
+// MULTI-STAGE RESEARCH PIPELINE ORCHESTRATOR
+// Runs Stages 1-4: Industry Research → Company Research → Strategic Synthesis → Fact-Checking
+// (Stage 0: Complementary Value Research is passed in as a parameter)
 async function generateMatchRationale(member1, member2, complementaryValueResearch, useGPT4 = false) {
   try {
     // STAGE 1: Industry Research
@@ -1744,7 +1916,7 @@ REMINDER: This is ${member1.name}'s personal briefing. Make them feel like they'
     // Always use GPT-4o for Stage 3 synthesis - quality is critical
     const model = 'gpt-4o';
 
-    console.log(`   🎯 Synthesizing with ${model} (Stage 3 of 3)...`);
+    console.log(`   🎯 STAGE 3: Synthesizing with ${model}...`);
     const response = await Promise.race([
       openai.chat.completions.create({
         model: model,
@@ -1768,10 +1940,22 @@ REMINDER: This is ${member1.name}'s personal briefing. Make them feel like they'
       throw new Error('Incomplete AI response from Stage 3 synthesis');
     }
 
-    console.log(`   ✅ COMPLETE: 3-stage research pipeline finished successfully`);
-    console.log(`      └─ Generated research-backed introduction for ${member1.name} ↔ ${member2.name}`);
+    console.log(`   ✅ Stage 3 complete: Strategic synthesis generated`);
 
-    return result;
+    // STAGE 4: Fact-check the synthesis for unsubstantiated claims
+    const factCheckedResult = await factCheckSynthesis(
+      result,
+      member1,
+      member2,
+      complementaryValueResearch,
+      industryResearch,
+      companyResearch
+    );
+
+    console.log(`   ✅ COMPLETE: 5-stage research pipeline finished successfully`);
+    console.log(`      └─ Generated fact-checked, research-backed introduction for ${member1.name} ↔ ${member2.name}`);
+
+    return factCheckedResult;
   } catch (error) {
     console.error(`   ❌ Multi-stage research failed:`, error.message);
 
@@ -1782,6 +1966,8 @@ REMINDER: This is ${member1.name}'s personal briefing. Make them feel like they'
       console.error('      └─ STAGE 2 (Company Research) timed out');
     } else if (error.message.includes('OpenAI API timeout')) {
       console.error('      └─ STAGE 3 (Synthesis) timed out');
+    } else if (error.message.includes('Fact-checking timeout')) {
+      console.error('      └─ STAGE 4 (Fact-Checking) timed out');
     } else {
       console.error('      └─ Error details:', error);
     }
