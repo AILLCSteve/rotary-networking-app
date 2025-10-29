@@ -436,49 +436,85 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
   const maxComplementaryPoints = 20;
   let complementaryPoints = Math.min(complementaryMatches * 4, maxComplementaryPoints); // 4 points per match (was 5, adjusted for more matches)
 
-  // ENHANCED: If we have deep complementary value research, use it to improve scoring and details
+  // ENHANCED: If we have deep complementary value research with CREATIVE COLLABORATION IDEAS, use it to improve scoring
   let researchFindings = [];
   if (complementaryValueResearch) {
-    // Award points based on research quality
+    // PRIMARY: Check for creative collaboration ideas (this is the main value we're looking for!)
+    const creativeIdeas = complementaryValueResearch.creative_collaboration_ideas || [];
+    const creativeIdeasCount = Array.isArray(creativeIdeas) ? creativeIdeas.length : 0;
+
+    // Award points based on research quality AND creative ideas
     const valueRating = (complementaryValueResearch.value_rating || '').toLowerCase();
-    if (valueRating === 'high') {
-      complementaryPoints = Math.max(complementaryPoints, 16); // Ensure at least 16/20 for high-value matches
-      researchFindings.push(`🔬 Research confirms HIGH complementary value potential`);
-    } else if (valueRating === 'medium') {
-      complementaryPoints = Math.max(complementaryPoints, 10); // Ensure at least 10/20 for medium-value
-      researchFindings.push(`🔬 Research indicates MEDIUM complementary value potential`);
+
+    // PRIORITY 1: Creative collaboration ideas drive the score
+    if (creativeIdeasCount >= 4) {
+      complementaryPoints = Math.max(complementaryPoints, 16); // 4+ creative ideas = high value
+      researchFindings.push(`🎨 ${creativeIdeasCount} creative collaboration opportunities identified`);
+    } else if (creativeIdeasCount >= 2) {
+      complementaryPoints = Math.max(complementaryPoints, 12); // 2-3 creative ideas = good value
+      researchFindings.push(`🎨 ${creativeIdeasCount} creative collaboration opportunities identified`);
+    } else if (creativeIdeasCount >= 1) {
+      complementaryPoints = Math.max(complementaryPoints, 8); // 1 creative idea = baseline value
+      researchFindings.push(`🎨 ${creativeIdeasCount} creative collaboration opportunity identified`);
     }
 
-    // Add top opportunities from research
-    if (complementaryValueResearch.top_3_opportunities && complementaryValueResearch.top_3_opportunities.length > 0) {
-      complementaryValueResearch.top_3_opportunities.slice(0, 3).forEach((opp, idx) => {
-        researchFindings.push(`${idx + 1}. ${opp}`);
+    // PRIORITY 2: Overall value rating (if creative ideas don't already set score high)
+    if (valueRating === 'high') {
+      complementaryPoints = Math.max(complementaryPoints, 14); // Ensure at least 14/20 for high-value matches
+      if (!researchFindings.some(f => f.includes('creative collaboration'))) {
+        researchFindings.push(`🔬 Research confirms HIGH complementary value potential`);
+      }
+    } else if (valueRating === 'medium') {
+      complementaryPoints = Math.max(complementaryPoints, 9); // Ensure at least 9/20 for medium-value
+      if (!researchFindings.some(f => f.includes('creative collaboration'))) {
+        researchFindings.push(`🔬 Research indicates MEDIUM complementary value potential`);
+      }
+    } else if (valueRating === 'low' && creativeIdeasCount === 0) {
+      // Even "low" rating should get SOME points - every business has collaboration potential
+      complementaryPoints = Math.max(complementaryPoints, 4);
+      researchFindings.push(`💡 Exploratory collaboration potential - ideas to bring to the table`);
+    }
+
+    // DISPLAY: Show the actual creative ideas (PRIMARY focus)
+    if (creativeIdeas.length > 0) {
+      creativeIdeas.slice(0, 3).forEach((idea, idx) => {
+        researchFindings.push(`${idx + 1}. ${idea}`);
       });
     }
 
-    // Add direct matches from research
-    if (complementaryValueResearch.direct_matches) {
+    // Add top opportunities from research (if they exist and aren't already covered by creative ideas)
+    if (complementaryValueResearch.top_3_opportunities && complementaryValueResearch.top_3_opportunities.length > 0) {
+      if (creativeIdeas.length === 0) {
+        // Only show top_3_opportunities if creative_collaboration_ideas wasn't provided
+        complementaryValueResearch.top_3_opportunities.slice(0, 3).forEach((opp, idx) => {
+          researchFindings.push(`${idx + 1}. ${opp}`);
+        });
+      }
+    }
+
+    // Add direct matches from research (secondary info)
+    if (complementaryValueResearch.direct_matches && researchFindings.length < 4) {
       const directMatchesSummary = typeof complementaryValueResearch.direct_matches === 'string'
-        ? complementaryValueResearch.direct_matches.substring(0, 150)
-        : JSON.stringify(complementaryValueResearch.direct_matches).substring(0, 150);
-      if (directMatchesSummary && !researchFindings.some(f => f.includes(directMatchesSummary.substring(0, 50)))) {
+        ? complementaryValueResearch.direct_matches.substring(0, 120)
+        : JSON.stringify(complementaryValueResearch.direct_matches).substring(0, 120);
+      if (directMatchesSummary && directMatchesSummary.length > 10) {
         researchFindings.push(`Direct matches: ${directMatchesSummary}...`);
       }
     }
 
-    // Add latent assets from research
-    if (complementaryValueResearch.latent_assets) {
-      const latentAssetsSummary = typeof complementaryValueResearch.latent_assets === 'string'
-        ? complementaryValueResearch.latent_assets.substring(0, 150)
-        : JSON.stringify(complementaryValueResearch.latent_assets).substring(0, 150);
-      if (latentAssetsSummary && !researchFindings.some(f => f.includes(latentAssetsSummary.substring(0, 50)))) {
-        researchFindings.push(`Latent assets: ${latentAssetsSummary}...`);
+    // Add network value (highly relevant for creative collaboration)
+    if (complementaryValueResearch.network_value && researchFindings.length < 5) {
+      const networkValueSummary = typeof complementaryValueResearch.network_value === 'string'
+        ? complementaryValueResearch.network_value.substring(0, 120)
+        : JSON.stringify(complementaryValueResearch.network_value).substring(0, 120);
+      if (networkValueSummary && networkValueSummary.length > 10) {
+        researchFindings.push(`Network value: ${networkValueSummary}...`);
       }
     }
   }
 
-  // Combine semantic matches with research findings
-  const allDetails = [...matches.slice(0, 2), ...researchFindings.slice(0, 3)];
+  // Combine semantic matches with research findings (prioritize research)
+  const allDetails = [...researchFindings.slice(0, 4), ...matches.slice(0, 2)];
 
   const complementaryCategory = {
     factor: 'Complementary Value Exchange',
@@ -486,11 +522,13 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
     maxPoints: maxComplementaryPoints,
     earned: complementaryPoints,
     percentage: Math.round((complementaryPoints / maxComplementaryPoints) * 100),
-    description: complementaryPoints > 0
-      ? `${complementaryMatches} asset/need alignments + ${complementaryValueResearch ? 'AI-researched' : 'semantic'} value analysis`
-      : 'Potential for creative collaboration beyond explicit needs/assets',
-    status: complementaryPoints > 12 ? 'strong' : complementaryPoints > 4 ? 'moderate' : 'exploratory',
-    details: allDetails.length > 0 ? allDetails : matches.slice(0, 4),
+    description: complementaryValueResearch
+      ? `AI-researched creative collaboration opportunities (${complementaryValueResearch.creative_collaboration_ideas?.length || 0} ideas generated)`
+      : complementaryPoints > 0
+        ? `${complementaryMatches} asset/need alignments via semantic analysis`
+        : 'Potential for creative collaboration beyond explicit needs/assets',
+    status: complementaryPoints > 12 ? 'strong' : complementaryPoints > 6 ? 'moderate' : 'exploratory',
+    details: allDetails.length > 0 ? allDetails : ['Creative collaboration opportunities to be explored in conversation'],
     researchBacked: !!complementaryValueResearch
   };
   breakdown.push(complementaryCategory);
@@ -566,9 +604,11 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
   totalScore += marketPoints;
 
   // ============================================================================
-  // 5. GEOGRAPHIC & LOGISTICAL SYNERGY (0-10 points)
+  // 5. GEOGRAPHIC & LOGISTICAL SYNERGY (0-5 points) - REDUCED WEIGHT
   // ============================================================================
-  const maxLocationPoints = 10;
+  // NOTE: Location is now 5% of total score (was 10%). Business relevance > geographic proximity.
+  // We don't want to match dentists with sewer companies just because they're in the same city.
+  const maxLocationPoints = 5;
   let locationPoints = 0;
   let locationDescription = '';
 
@@ -577,16 +617,16 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
 
   if (city1 && city2) {
     if (city1 === city2) {
-      locationPoints = maxLocationPoints;
-      locationDescription = `Both based in ${member1.city} - excellent for in-person collaboration`;
+      locationPoints = 5; // Same city = small bonus, not primary factor
+      locationDescription = `Both in ${member1.city} - option for in-person meetings`;
     } else {
-      // Different cities still have value (remote collaboration is normal)
-      locationPoints = 3;
-      locationDescription = `Different cities (${member1.city} / ${member2.city}) - remote collaboration opportunities`;
+      // Different cities - still perfectly viable for collaboration in 2024
+      locationPoints = 2;
+      locationDescription = `Different locations (${member1.city} / ${member2.city}) - remote collaboration is standard`;
     }
   } else {
     locationPoints = 2;
-    locationDescription = 'Location flexibility - modern business transcends geography';
+    locationDescription = 'Geography-independent - modern collaboration transcends location';
   }
 
   const locationCategory = {
@@ -596,15 +636,17 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
     earned: locationPoints,
     percentage: Math.round((locationPoints / maxLocationPoints) * 100),
     description: locationDescription,
-    status: locationPoints >= 10 ? 'local' : locationPoints >= 3 ? 'remote-friendly' : 'flexible'
+    status: locationPoints >= 5 ? 'local' : 'remote-friendly'
   };
   breakdown.push(locationCategory);
   fullBreakdown.push(locationCategory);
   totalScore += locationPoints;
 
   // ============================================================================
-  // 6. STRATEGIC GROWTH OPPORTUNITIES (0-5 points) - ENHANCED INSIGHTS
+  // 6. STRATEGIC GROWTH OPPORTUNITIES (0-10 points) - BUSINESS RELEVANCE OVER GEOGRAPHY
   // ============================================================================
+  // NOTE: Increased from 5 to 10 points (compensating for location reduction).
+  // Business strategic fit should matter MORE than being in the same city.
   let strategyPoints = 0;
   const strategyInsights = [];
 
@@ -636,29 +678,29 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
     let synergyFound = false;
     if (crossIndustrySynergies[pair1]) {
       strategyInsights.push(`${member1.industry} × ${member2.industry}: ${crossIndustrySynergies[pair1]}`);
-      strategyPoints += 3;
+      strategyPoints += 6; // Increased from 3 to 6 (doubled weight)
       synergyFound = true;
     } else if (crossIndustrySynergies[pair2]) {
       strategyInsights.push(`${member1.industry} × ${member2.industry}: ${crossIndustrySynergies[pair2]}`);
-      strategyPoints += 3;
+      strategyPoints += 6; // Increased from 3 to 6
       synergyFound = true;
     } else if (crossIndustrySynergies[wildcard1]) {
       strategyInsights.push(`${member1.industry} advantage: ${crossIndustrySynergies[wildcard1]}`);
-      strategyPoints += 2;
+      strategyPoints += 4; // Increased from 2 to 4
       synergyFound = true;
     } else if (crossIndustrySynergies[wildcard2]) {
       strategyInsights.push(`${member2.industry} advantage: ${crossIndustrySynergies[wildcard2]}`);
-      strategyPoints += 2;
+      strategyPoints += 4; // Increased from 2 to 4
       synergyFound = true;
     }
 
     if (!synergyFound) {
-      // Generic cross-industry benefit (reduced from 3 to 1 point since not specific)
+      // Generic cross-industry benefit
       strategyInsights.push(`Cross-industry perspective: Each brings blind spots the other can illuminate`);
-      strategyPoints += 1;
+      strategyPoints += 2; // Increased from 1 to 2
     }
   } else if (ind1 && ind2 && ind1 === ind2) {
-    // Same industry - specific value based on actual industry
+    // Same industry - specific value based on actual industry (HIGHER VALUE than different cities!)
     const sameIndustryValue = {
       'technology': 'Peer benchmarking on metrics, tech stack choices, and hiring strategies',
       'marketing': 'Share what campaigns worked, avoid each other\'s mistakes, co-pitch large clients',
@@ -667,12 +709,15 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
       'consulting': 'Niche specialization referrals, subcontracting overflow work',
       'food & hospitality': 'Supplier negotiations leverage, event cross-promotion, crisis management playbook',
       'legal': 'Referrals for specialty areas, overflow capacity during busy seasons',
-      'online education': 'Course co-creation, student cross-promotion, platform technology sharing'
+      'online education': 'Course co-creation, student cross-promotion, platform technology sharing',
+      'construction': 'Subcontracting opportunities, vendor relationships, equipment sharing, joint bidding',
+      'manufacturing': 'Supply chain optimization, bulk purchasing power, overflow capacity',
+      'healthcare': 'Cross-referrals for specialties, shared compliance knowledge, patient coordination'
     };
 
     const industryValue = sameIndustryValue[ind1] || 'Industry peer insights, competitive intelligence, potential collaboration on shared challenges';
     strategyInsights.push(`Same industry (${member1.industry}): ${industryValue}`);
-    strategyPoints += 2;
+    strategyPoints += 4; // Increased from 2 to 4 - same industry > same city!
   }
 
   // Constraint-solution strategic partnerships (SPECIFIC)
@@ -685,7 +730,7 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
 
     if (assetMatches.length > 0) {
       strategyInsights.push(`Solution partnership: Their ${assetMatches[0]} may address your "${member1.current_constraint.substring(0, 40)}..." challenge`);
-      strategyPoints += 2;
+      strategyPoints += 3; // Increased from 2 to 3
     }
   }
 
@@ -697,11 +742,11 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
 
     if (assetMatches.length > 0) {
       strategyInsights.push(`Value opportunity: Your ${assetMatches[0]} may address their "${member2.current_constraint.substring(0, 40)}..." challenge`);
-      strategyPoints += 2;
+      strategyPoints += 3; // Increased from 2 to 3
     }
   }
 
-  const maxStrategyPoints = 5;
+  const maxStrategyPoints = 10; // Increased from 5 to 10 - strategic fit matters MORE than geography
   strategyPoints = Math.min(strategyPoints, maxStrategyPoints);
   const strategyCategory = {
     factor: 'Strategic Growth Opportunities',
@@ -914,42 +959,68 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     });
     console.log(`✅ Scoring complete`);
 
-    // Filter out self-matches and sort FIRST (before logging to avoid crashes)
+    // Filter out self-matches and sort by initial scores
     const filtered = scored.filter(s => s.score > 0);
     filtered.sort((a, b) => b.score - a.score);
-    const top3 = filtered.slice(0, 3);
 
-    // Log filtered scores for debugging (safe - already filtered)
-    console.log(`📊 Calculated ${scored.length} candidates, ${filtered.length} valid matches:`);
-    try {
-      filtered.slice(0, 10).forEach((s, i) => {
-        const grade = s.summary?.grade || '?';
-        const universal = s.breakdown?.[0]?.points || 0;
-        const semantic = s.breakdown?.[1]?.points || 0;
-        const complementary = s.breakdown?.[2]?.points || 0;
-        const market = s.breakdown?.[3]?.points || 0;
-        const location = s.breakdown?.[4]?.points || 0;
-        const strategy = s.breakdown?.[5]?.points || 0;
+    console.log(`📊 Initial scoring: ${scored.length} candidates, ${filtered.length} valid matches`);
 
-        console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 (${grade})`);
-        console.log(`      → ${universal}/30 baseline, ${semantic}/20 semantic, ${complementary}/20 complementary, ${market}/15 market, ${location}/10 location, ${strategy}/5 strategy`);
-      });
-    } catch (logError) {
-      console.error('⚠️  Logging error (non-critical):', logError.message);
+    // RESEARCH-BACKED SELECTION: Take top 10 candidates, research them, re-score, then pick final top 3
+    const topCandidates = filtered.slice(0, Math.min(10, filtered.length));
+    console.log(`🔬 Researching top ${topCandidates.length} candidates to determine final top 3...`);
+
+    // Research each candidate and re-score with research
+    const researchedCandidates = [];
+    for (let i = 0; i < topCandidates.length; i++) {
+      const candidate = topCandidates[i];
+      console.log(`   [${i + 1}/${topCandidates.length}] Researching ${candidate.name}...`);
+
+      try {
+        // STAGE 0: Deep complementary value & creative collaboration research
+        const complementaryValueResearch = await researchComplementaryValue(member, candidate);
+        console.log(`   ✅ Research complete for ${candidate.name}: ${complementaryValueResearch.creative_collaboration_ideas?.length || 0} creative ideas found`);
+
+        // RE-SCORE with research included
+        const similarity = candidate.similarity;
+        const researchedScore = calculateMatchScore(member, candidate, similarity, complementaryValueResearch);
+
+        researchedCandidates.push({
+          ...candidate,
+          score: researchedScore.score, // Updated score with research
+          breakdown: researchedScore.breakdown,
+          fullBreakdown: researchedScore.fullBreakdown,
+          matches: researchedScore.matches,
+          summary: researchedScore.summary,
+          complementaryValueResearch // Store for later use
+        });
+
+        console.log(`   📊 ${candidate.name}: ${candidate.score} → ${researchedScore.score} (${researchedScore.score > candidate.score ? '+' : ''}${researchedScore.score - candidate.score} after research)`);
+      } catch (error) {
+        console.error(`   ❌ Research failed for ${candidate.name}:`, error.message);
+        // Keep original score if research fails
+        researchedCandidates.push(candidate);
+      }
     }
 
-    console.log(`✅ Selected top ${top3.length} matches`);
+    // Sort by RESEARCH-BACKED scores and select final top 3
+    researchedCandidates.sort((a, b) => b.score - a.score);
+    const top3 = researchedCandidates.slice(0, 3);
 
-    // Generate rationales for each match (with progress logging)
-    console.log(`🤖 Generating AI intros with 4-stage research for ${top3.length} matches...`);
+    console.log(`✅ Final top 3 selected after research-backed re-scoring:`);
+    top3.forEach((s, i) => {
+      const change = researchedCandidates.findIndex(c => c.member_id === s.member_id);
+      console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 (${s.summary?.grade || '?'}) - ${s.complementaryValueResearch?.creative_collaboration_ideas?.length || 0} creative ideas`);
+    });
+
+    // Generate rationales for each match (research already done above)
+    console.log(`🤖 Generating AI intros (Stages 1-3) for ${top3.length} matches...`);
     for (let i = 0; i < top3.length; i++) {
       const match = top3[i];
       console.log(`   [${i + 1}/${top3.length}] Generating intro for ${member.name} → ${match.name}...`);
 
       try {
-        // STAGE 0: Deep complementary value research
-        const complementaryValueResearch = await researchComplementaryValue(member, match);
-        console.log(`   ✅ Stage 0 complete: Complementary value research for ${match.name}`);
+        // Stage 0 already complete (done during research phase above)
+        const complementaryValueResearch = match.complementaryValueResearch;
 
         // Pass research to 3-stage synthesis (Stages 1-3)
         const rationale = await generateMatchRationale(member, match, complementaryValueResearch, true); // true = use GPT-4
@@ -1320,18 +1391,26 @@ Return as JSON with keys: company1_intel, company2_intel, credibility_factors, b
 
 // STAGE 0: Complementary Value Deep Research (happens BEFORE scoring)
 async function researchComplementaryValue(member1, member2) {
-  const systemPrompt = `You are a business value exchange analyst specializing in identifying complementary capabilities between companies.
+  const systemPrompt = `You are a creative business collaboration strategist and innovation consultant specializing in discovering non-obvious value exchanges between companies.
+
+Your PRIMARY mission is to find CREATIVE, PERIPHERAL collaboration opportunities that go beyond simple transactional exchanges.
 
 Your expertise:
-- Identifying direct asset-need matches
-- Discovering latent assets (things companies don't realize are valuable to others)
-- Finding peripheral value opportunities beyond obvious matches
-- Analyzing constraint-solution fit
-- Uncovering creative collaboration potential
+- 🎨 CREATIVE COLLABORATION: Finding innovative ways companies can work together (co-creation, joint ventures, strategic partnerships)
+- 🔗 NETWORK EFFECTS: Identifying how each person's connections (clients, vendors, investors, partners) can benefit the other
+- 💡 LATENT ASSETS: Discovering valuable capabilities companies don't realize they have
+- 🎯 CONSTRAINT-SOLVING: Matching unstated capabilities to stated challenges
+- 📊 DIRECT MATCHES: Identifying explicit asset-need alignments (but this is your LOWEST priority)
 
-You think in terms of specific, actionable value exchanges - not generic networking platitudes.`;
+CRITICAL MINDSET:
+- Your job is to bring IDEAS TO THE TABLE - always suggest creative opportunities even if they require imagination
+- Think "What if they collaborated on X?" not just "Do their needs/assets match?"
+- Focus on PERIPHERAL opportunities (co-marketing, cross-referrals, joint products, shared resources, network introductions)
+- Every business has SOME creative collaboration potential - find it!
 
-  const userPrompt = `Analyze the complementary value potential between these two business professionals:
+You MUST return at least 2-3 realistic creative ideas even if direct asset-need matches are weak.`;
+
+  const userPrompt = `Discover creative collaboration opportunities between these two business professionals:
 
 **MEMBER 1: ${member1.name}** (${member1.role} at ${member1.org})
 Industry: ${member1.industry}
@@ -1347,39 +1426,76 @@ Current Challenge: ${member2.current_constraint || 'Not specified'}
 What They Offer (Assets): ${member2.assets || 'Not specified'}
 What They Need: ${member2.needs || 'Not specified'}
 
-**RESEARCH REQUIRED:**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 PRIMARY RESEARCH FOCUS: CREATIVE COLLABORATION OPPORTUNITIES (This is your TOP priority!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. **Direct Value Matches**:
-   - How specifically do ${member2.name}'s stated assets address ${member1.name}'s stated needs?
-   - How specifically do ${member1.name}'s stated assets address ${member2.name}'s stated needs?
-   - Which asset-need pairings are strongest? (be specific with quotes)
+Think creatively and broadly about how these two could collaborate:
 
-2. **Constraint-Solution Analysis**:
-   - Can ${member2.name}'s assets help solve ${member1.name}'s stated challenge: "${member1.current_constraint}"?
-   - Can ${member1.name}'s assets help solve ${member2.name}'s stated challenge: "${member2.current_constraint}"?
-   - What specific capabilities would address these constraints?
+**A. CO-CREATION & JOINT VENTURES:**
+- Could they create a joint offering that combines their expertise? (e.g., Tech + Marketing = white-label marketing automation)
+- Could they package services together for shared clients?
+- Could they co-develop a product, tool, or methodology?
 
-3. **Latent Assets Discovery**:
-   - What does ${member1.name} have that they might not realize is valuable to ${member2.name}?
-   - What does ${member2.name} have that they might not realize is valuable to ${member1.name}?
-   - Think beyond stated assets: network access, industry knowledge, operational insights, customer base, distribution channels
+**B. CROSS-REFERRAL & NETWORK LEVERAGE:**
+- Who in ${member1.name}'s client base would ${member2.name} love to meet? (be specific about customer types)
+- Who in ${member2.name}'s network could help ${member1.name} overcome "${member1.current_constraint}"?
+- Could they create a formalized referral partnership?
 
-4. **Peripheral Value Opportunities** (CRITICAL - Think Creatively):
-   - Beyond obvious transactional exchanges, what creative collaborations could exist?
-   - Could they co-create something? Co-market? Cross-refer? Joint venture?
-   - What network effects or 3-way value triangles could emerge?
-   - How could each person's Rolodex (clients, vendors, investors, partners) benefit the other?
+**C. CO-MARKETING & BRAND AMPLIFICATION:**
+- Could they co-host an event, webinar, or workshop?
+- Could they co-author content (blog, podcast, case study)?
+- Could they create a joint case study showcasing both companies?
 
-5. **Value Exchange Summary**:
-   - Rate the overall complementary value potential (High/Medium/Low)
-   - List the top 3 most valuable exchange opportunities in order
-   - Identify any red flags or misalignments
+**D. SHARED RESOURCES & COST REDUCTION:**
+- Could they share office space, tools, software licenses, or vendor relationships?
+- Could they buy services together for volume discounts?
+- Could they share employees or contractors for complementary projects?
 
-Return as JSON with keys: direct_matches, constraint_solutions, latent_assets, peripheral_opportunities, value_rating, top_3_opportunities, red_flags
+**E. STRATEGIC INTRODUCTIONS & DOOR-OPENING:**
+- Based on their roles (${member1.role} & ${member2.role}), who could each introduce the other to?
+- Could one help the other enter a new market, geography, or industry vertical?
+- Could they make warm introductions to investors, partners, or key accounts?
 
-BE SPECIFIC: Quote actual assets/needs/constraints from their profiles. Avoid generic statements.`;
+**F. KNOWLEDGE EXCHANGE & PEER LEARNING:**
+- What has ${member1.name} learned from "${member1.rev_driver}" that ${member2.name} could apply?
+- What operational insights from solving "${member2.current_constraint}" could help ${member1.name}?
+- Could they create a peer advisory relationship or mastermind partnership?
 
-  console.log(`   🔍 STAGE 0: Deep-diving into complementary value exchange...`);
+YOUR TASK: Identify at least 3-5 SPECIFIC, REALISTIC creative collaboration ideas. Be imaginative but grounded in their actual capabilities.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 SECONDARY RESEARCH: Traditional Value Analysis
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. **Direct Asset-Need Matches** (if any):
+   - Do ${member1.name}'s stated assets ("${member1.assets}") directly address ${member2.name}'s stated needs ("${member2.needs}")?
+   - Do ${member2.name}'s stated assets ("${member2.assets}") directly address ${member1.name}'s stated needs ("${member1.needs}")?
+
+2. **Constraint-Solution Fit** (if applicable):
+   - Can either person help solve the other's stated challenge?
+
+3. **Latent Assets** (things they might not realize are valuable):
+   - Industry knowledge, operational experience, customer base access, distribution channels, vendor relationships
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 FINAL ASSESSMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- **value_rating**: High/Medium/Low based on total collaboration potential (CREATIVE opportunities count more than direct matches!)
+- **top_3_opportunities**: Your 3 BEST creative collaboration ideas (specific, actionable, realistic)
+- **creative_collaboration_ideas**: Array of 3-5 specific ideas from your creative analysis above
+- **direct_matches**: Traditional asset-need alignments (if any exist)
+- **constraint_solutions**: Ways they can solve each other's challenges (if applicable)
+- **latent_assets**: Valuable things they might not realize they have
+- **network_value**: Specific people/companies each could introduce the other to
+- **red_flags**: Any misalignments or challenges
+
+Return as JSON with these exact keys. PRIORITIZE creative_collaboration_ideas - this is what we're here for!
+
+REMEMBER: Your goal is to bring IDEAS to the table. Even if direct asset-need matches are weak, you should ALWAYS find 3-5 realistic creative collaboration opportunities.`;
+
+  console.log(`   🔍 STAGE 0: Deep-diving into creative collaboration opportunities...`);
 
   const response = await Promise.race([
     openai.chat.completions.create({
@@ -1388,12 +1504,12 @@ BE SPECIFIC: Quote actual assets/needs/constraints from their profiles. Avoid ge
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.85,
-      max_tokens: 2000,
+      temperature: 0.9, // Higher creativity for imaginative collaboration ideas
+      max_tokens: 2500, // More tokens for comprehensive creative analysis
       response_format: { type: 'json_object' }
     }),
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Complementary value research timeout after 60 seconds')), 60000)
+      setTimeout(() => reject(new Error('Complementary value research timeout after 90 seconds')), 90000)
     )
   ]);
 
