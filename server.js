@@ -216,7 +216,7 @@ function cosineSimilarity(vec1, vec2) {
 
 // Calculate match score with detailed breakdown (100-point system)
 // PHILOSOPHY: Every business professional has networking potential - score reflects quality/synergy depth
-function calculateMatchScore(member1, member2, similarity) {
+function calculateMatchScore(member1, member2, similarity, complementaryValueResearch = null) {
   const breakdown = [];
   const fullBreakdown = [];
   let totalScore = 0;
@@ -434,7 +434,52 @@ function calculateMatchScore(member1, member2, similarity) {
   }
 
   const maxComplementaryPoints = 20;
-  const complementaryPoints = Math.min(complementaryMatches * 4, maxComplementaryPoints); // 4 points per match (was 5, adjusted for more matches)
+  let complementaryPoints = Math.min(complementaryMatches * 4, maxComplementaryPoints); // 4 points per match (was 5, adjusted for more matches)
+
+  // ENHANCED: If we have deep complementary value research, use it to improve scoring and details
+  let researchFindings = [];
+  if (complementaryValueResearch) {
+    // Award points based on research quality
+    const valueRating = (complementaryValueResearch.value_rating || '').toLowerCase();
+    if (valueRating === 'high') {
+      complementaryPoints = Math.max(complementaryPoints, 16); // Ensure at least 16/20 for high-value matches
+      researchFindings.push(`🔬 Research confirms HIGH complementary value potential`);
+    } else if (valueRating === 'medium') {
+      complementaryPoints = Math.max(complementaryPoints, 10); // Ensure at least 10/20 for medium-value
+      researchFindings.push(`🔬 Research indicates MEDIUM complementary value potential`);
+    }
+
+    // Add top opportunities from research
+    if (complementaryValueResearch.top_3_opportunities && complementaryValueResearch.top_3_opportunities.length > 0) {
+      complementaryValueResearch.top_3_opportunities.slice(0, 3).forEach((opp, idx) => {
+        researchFindings.push(`${idx + 1}. ${opp}`);
+      });
+    }
+
+    // Add direct matches from research
+    if (complementaryValueResearch.direct_matches) {
+      const directMatchesSummary = typeof complementaryValueResearch.direct_matches === 'string'
+        ? complementaryValueResearch.direct_matches.substring(0, 150)
+        : JSON.stringify(complementaryValueResearch.direct_matches).substring(0, 150);
+      if (directMatchesSummary && !researchFindings.some(f => f.includes(directMatchesSummary.substring(0, 50)))) {
+        researchFindings.push(`Direct matches: ${directMatchesSummary}...`);
+      }
+    }
+
+    // Add latent assets from research
+    if (complementaryValueResearch.latent_assets) {
+      const latentAssetsSummary = typeof complementaryValueResearch.latent_assets === 'string'
+        ? complementaryValueResearch.latent_assets.substring(0, 150)
+        : JSON.stringify(complementaryValueResearch.latent_assets).substring(0, 150);
+      if (latentAssetsSummary && !researchFindings.some(f => f.includes(latentAssetsSummary.substring(0, 50)))) {
+        researchFindings.push(`Latent assets: ${latentAssetsSummary}...`);
+      }
+    }
+  }
+
+  // Combine semantic matches with research findings
+  const allDetails = [...matches.slice(0, 2), ...researchFindings.slice(0, 3)];
+
   const complementaryCategory = {
     factor: 'Complementary Value Exchange',
     points: complementaryPoints,
@@ -442,10 +487,11 @@ function calculateMatchScore(member1, member2, similarity) {
     earned: complementaryPoints,
     percentage: Math.round((complementaryPoints / maxComplementaryPoints) * 100),
     description: complementaryPoints > 0
-      ? `${complementaryMatches} asset/need alignment${complementaryMatches > 1 ? 's' : ''} found through semantic analysis`
+      ? `${complementaryMatches} asset/need alignments + ${complementaryValueResearch ? 'AI-researched' : 'semantic'} value analysis`
       : 'Potential for creative collaboration beyond explicit needs/assets',
     status: complementaryPoints > 12 ? 'strong' : complementaryPoints > 4 ? 'moderate' : 'exploratory',
-    details: matches.slice(0, 4) // Show up to 4 best matches
+    details: allDetails.length > 0 ? allDetails : matches.slice(0, 4),
+    researchBacked: !!complementaryValueResearch
   };
   breakdown.push(complementaryCategory);
   fullBreakdown.push(complementaryCategory);
@@ -895,13 +941,18 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     console.log(`✅ Selected top ${top3.length} matches`);
 
     // Generate rationales for each match (with progress logging)
-    console.log(`🤖 Generating AI intros for ${top3.length} matches...`);
+    console.log(`🤖 Generating AI intros with 4-stage research for ${top3.length} matches...`);
     for (let i = 0; i < top3.length; i++) {
       const match = top3[i];
       console.log(`   [${i + 1}/${top3.length}] Generating intro for ${member.name} → ${match.name}...`);
 
       try {
-        const rationale = await generateMatchRationale(member, match, true); // true = use GPT-4
+        // STAGE 0: Deep complementary value research
+        const complementaryValueResearch = await researchComplementaryValue(member, match);
+        console.log(`   ✅ Stage 0 complete: Complementary value research for ${match.name}`);
+
+        // Pass research to 3-stage synthesis (Stages 1-3)
+        const rationale = await generateMatchRationale(member, match, complementaryValueResearch, true); // true = use GPT-4
 
         // Ensure intro_basis is a string (handle if AI returns object)
         let introBasisString = rationale.intro_basis;
@@ -917,7 +968,8 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
           score: match.score,
           breakdown: match.breakdown, // Concise for display
           fullBreakdown: match.fullBreakdown, // Complete objective matrix
-          summary: match.summary // Grade and percentage
+          summary: match.summary, // Grade and percentage
+          complementaryValueResearch // Store research findings for display
         };
 
         await db.run(`
@@ -1045,14 +1097,20 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     console.log(`📊 Score Distribution: 75+:${scoreRanges.excellent}, 60-74:${scoreRanges.strong}, 50-59:${scoreRanges.good}, 40-49:${scoreRanges.moderate}, 30-39:${scoreRanges.baseline}, 1-29:${scoreRanges.low}, 0:${scoreRanges.zero}`);
     console.log(`📊 Brainstorm: ${scored.length} total candidates, ${filtered.length} valid matches (all included - no filtering)`);
 
-    // Generate AI rationales for brainstorm matches (using GPT-4o for maximum quality)
-    console.log(`🤖 Generating AI intros for ${brainstorm.length} brainstorm matches (using GPT-4o - may take 1-3 minutes)...`);
+    // Generate AI rationales for brainstorm matches (using GPT-4o with 4-stage research)
+    console.log(`🤖 Generating AI intros with 4-stage research for ${brainstorm.length} brainstorm matches (may take 2-4 minutes)...`);
     for (let i = 0; i < brainstorm.length; i++) {
       const match = brainstorm[i];
       console.log(`   [${i + 1}/${brainstorm.length}] Generating intro for ${member.name} → ${match.name}...`);
 
       try {
-        const rationale = await generateMatchRationale(member, match, true); // true = use GPT-4o for quality
+        // STAGE 0: Deep complementary value research (happens BEFORE synthesis)
+        const complementaryValueResearch = await researchComplementaryValue(member, match);
+        console.log(`   ✅ Stage 0 complete: Complementary value research for ${match.name}`);
+
+        // Pass complementary value research to 3-stage synthesis (Stages 1-3)
+        const rationale = await generateMatchRationale(member, match, complementaryValueResearch, true); // true = use GPT-4o
+        console.log(`   ✅ Stages 1-3 complete: Strategic synthesis for ${match.name}`);
 
         // Ensure intro_basis is a string (handle if AI returns object)
         let introBasisString = rationale.intro_basis;
@@ -1064,11 +1122,13 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
         const introId = generateId('intro');
 
         // Store both concise breakdown and full breakdown for complete transparency
+        // PLUS the complementary value research findings
         const scoreData = {
           score: match.score,
           breakdown: match.breakdown, // Concise for display
           fullBreakdown: match.fullBreakdown, // Complete objective matrix
-          summary: match.summary // Grade and percentage
+          summary: match.summary, // Grade and percentage
+          complementaryValueResearch // Store research findings for display
         };
 
         await db.run(`
@@ -1258,8 +1318,90 @@ Return as JSON with keys: company1_intel, company2_intel, credibility_factors, b
   return JSON.parse(response.choices[0].message.content);
 }
 
+// STAGE 0: Complementary Value Deep Research (happens BEFORE scoring)
+async function researchComplementaryValue(member1, member2) {
+  const systemPrompt = `You are a business value exchange analyst specializing in identifying complementary capabilities between companies.
+
+Your expertise:
+- Identifying direct asset-need matches
+- Discovering latent assets (things companies don't realize are valuable to others)
+- Finding peripheral value opportunities beyond obvious matches
+- Analyzing constraint-solution fit
+- Uncovering creative collaboration potential
+
+You think in terms of specific, actionable value exchanges - not generic networking platitudes.`;
+
+  const userPrompt = `Analyze the complementary value potential between these two business professionals:
+
+**MEMBER 1: ${member1.name}** (${member1.role} at ${member1.org})
+Industry: ${member1.industry}
+Revenue Model: ${member1.rev_driver || 'Not specified'}
+Current Challenge: ${member1.current_constraint || 'Not specified'}
+What They Offer (Assets): ${member1.assets || 'Not specified'}
+What They Need: ${member1.needs || 'Not specified'}
+
+**MEMBER 2: ${member2.name}** (${member2.role} at ${member2.org})
+Industry: ${member2.industry}
+Revenue Model: ${member2.rev_driver || 'Not specified'}
+Current Challenge: ${member2.current_constraint || 'Not specified'}
+What They Offer (Assets): ${member2.assets || 'Not specified'}
+What They Need: ${member2.needs || 'Not specified'}
+
+**RESEARCH REQUIRED:**
+
+1. **Direct Value Matches**:
+   - How specifically do ${member2.name}'s stated assets address ${member1.name}'s stated needs?
+   - How specifically do ${member1.name}'s stated assets address ${member2.name}'s stated needs?
+   - Which asset-need pairings are strongest? (be specific with quotes)
+
+2. **Constraint-Solution Analysis**:
+   - Can ${member2.name}'s assets help solve ${member1.name}'s stated challenge: "${member1.current_constraint}"?
+   - Can ${member1.name}'s assets help solve ${member2.name}'s stated challenge: "${member2.current_constraint}"?
+   - What specific capabilities would address these constraints?
+
+3. **Latent Assets Discovery**:
+   - What does ${member1.name} have that they might not realize is valuable to ${member2.name}?
+   - What does ${member2.name} have that they might not realize is valuable to ${member1.name}?
+   - Think beyond stated assets: network access, industry knowledge, operational insights, customer base, distribution channels
+
+4. **Peripheral Value Opportunities** (CRITICAL - Think Creatively):
+   - Beyond obvious transactional exchanges, what creative collaborations could exist?
+   - Could they co-create something? Co-market? Cross-refer? Joint venture?
+   - What network effects or 3-way value triangles could emerge?
+   - How could each person's Rolodex (clients, vendors, investors, partners) benefit the other?
+
+5. **Value Exchange Summary**:
+   - Rate the overall complementary value potential (High/Medium/Low)
+   - List the top 3 most valuable exchange opportunities in order
+   - Identify any red flags or misalignments
+
+Return as JSON with keys: direct_matches, constraint_solutions, latent_assets, peripheral_opportunities, value_rating, top_3_opportunities, red_flags
+
+BE SPECIFIC: Quote actual assets/needs/constraints from their profiles. Avoid generic statements.`;
+
+  console.log(`   🔍 STAGE 0: Deep-diving into complementary value exchange...`);
+
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.85,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' }
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Complementary value research timeout after 60 seconds')), 60000)
+    )
+  ]);
+
+  return JSON.parse(response.choices[0].message.content);
+}
+
 // STAGE 3: Strategic Match Synthesis & Introduction Generation
-async function generateMatchRationale(member1, member2, useGPT4 = false) {
+async function generateMatchRationale(member1, member2, complementaryValueResearch, useGPT4 = false) {
   try {
     // STAGE 1: Industry Research
     const industryResearch = await researchIndustryContext(member1, member2);
@@ -1346,6 +1488,22 @@ ${JSON.stringify(industryResearch, null, 2)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${JSON.stringify(companyResearch, null, 2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💎 STAGE 0 RESEARCH: COMPLEMENTARY VALUE ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${JSON.stringify(complementaryValueResearch, null, 2)}
+
+**CRITICAL**: This deep-dive analyzed:
+- Direct asset-need matches (what each explicitly offers the other)
+- Constraint-solution fit (can they solve each other's stated challenges?)
+- Latent assets (valuable things they might not realize they have)
+- Peripheral opportunities (creative collaborations beyond obvious exchanges)
+- Top 3 most valuable exchange opportunities
+- Value rating: ${complementaryValueResearch.value_rating || 'Analyzed'}
+
+Use these findings EXTENSIVELY in your strategic rationale and collaboration angle.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 PARTICIPANT PROFILES
