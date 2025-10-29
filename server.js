@@ -231,20 +231,55 @@ function calculateMatchScore(member1, member2, similarity) {
   // ============================================================================
   // Every attendee gets this - represents fundamental networking value
   const universalPoints = 30;
+
+  // Build SPECIFIC universal value reasons based on actual profile data
+  const universalReasons = [];
+
+  // Reason 1: Role-specific strategic value
+  const roleA = (member1.role || '').toLowerCase();
+  const roleB = (member2.role || '').toLowerCase();
+  if (roleA.includes('ceo') || roleA.includes('founder') || roleA.includes('owner')) {
+    if (roleB.includes('ceo') || roleB.includes('founder') || roleB.includes('owner')) {
+      universalReasons.push(`Both decision-makers: Can authorize partnerships, investments, or strategic deals on the spot`);
+    } else {
+      universalReasons.push(`Decision-maker meeting specialist: Direct path to implementation without bureaucracy`);
+    }
+  } else {
+    universalReasons.push(`Operational expertise: Both understand the day-to-day realities of executing business strategy`);
+  }
+
+  // Reason 2: Revenue model knowledge transfer
+  const revA = member1.rev_driver || '';
+  const revB = member2.rev_driver || '';
+  if (revA && revB) {
+    universalReasons.push(`Revenue model exchange: "${revA.substring(0, 40)}..." can inform "${revB.substring(0, 40)}..." and vice versa`);
+  } else {
+    universalReasons.push(`Business model innovation: Opportunity to learn how different companies generate revenue`);
+  }
+
+  // Reason 3: Constraint as teaching opportunity
+  const constraintA = member1.current_constraint || '';
+  const constraintB = member2.current_constraint || '';
+  if (constraintA && constraintB) {
+    universalReasons.push(`Parallel challenges: Both facing "${constraintA.substring(0, 35)}..." and "${constraintB.substring(0, 35)}..." - shared problem-solving opportunity`);
+  } else if (constraintA || constraintB) {
+    universalReasons.push(`Growth mindset: One party's solved problem may be the other's current challenge`);
+  } else {
+    universalReasons.push(`Proven operators: No stated constraints suggests sophisticated problem-solving capabilities`);
+  }
+
+  // Reason 4: Network effect multiplication (always true)
+  universalReasons.push(`Network multiplication: Each person's Rolodex becomes accessible (clients, vendors, investors, mentors, talent)`);
+
   const universalCategory = {
     factor: 'Universal Business Potential',
     points: universalPoints,
     maxPoints: 30,
     earned: universalPoints,
     percentage: 100,
-    description: 'All business professionals share common ground: revenue growth goals, operational challenges, desire to network and learn',
+    description: `Baseline value from business leadership connection: knowledge transfer, network access, strategic positioning`,
     status: 'baseline',
-    reasoning: [
-      'Both are entrepreneurs/business leaders seeking growth',
-      'Shared experience navigating business challenges',
-      'Mutual interest in expanding professional network',
-      'Universal business needs: customers, capital, talent, efficiency'
-    ]
+    reasoning: universalReasons
   };
   breakdown.push(universalCategory);
   fullBreakdown.push(universalCategory);
@@ -276,33 +311,130 @@ function calculateMatchScore(member1, member2, similarity) {
   const member2Assets = member2.assets ? member2.assets.split(',').map(a => a.trim().toLowerCase()) : [];
 
   // ============================================================================
-  // 3. COMPLEMENTARY VALUE EXCHANGE (0-20 points)
+  // 3. COMPLEMENTARY VALUE EXCHANGE (0-20 points) - ENHANCED MATCHING
   // ============================================================================
   let complementaryMatches = 0;
   const matches = [];
 
-  // Check if member1's assets match member2's needs
+  // Enhanced matching with synonyms and semantic clusters
+  const matchesNeedAsset = (need, asset) => {
+    // Direct substring match
+    if (asset.includes(need) || need.includes(asset)) return true;
+
+    // Keyword-based semantic matching
+    const keywords = {
+      // Marketing cluster
+      'marketing': ['seo', 'social media', 'content', 'brand', 'advertising', 'promotion', 'digital marketing', 'pr', 'public relations', 'campaign'],
+      'seo': ['marketing', 'digital marketing', 'google', 'search', 'content', 'web'],
+      'social media': ['marketing', 'content creation', 'brand', 'instagram', 'facebook', 'linkedin', 'tiktok'],
+      'branding': ['marketing', 'design', 'logo', 'identity', 'brand strategy'],
+      'content': ['marketing', 'writing', 'blog', 'social media', 'video', 'copywriting'],
+
+      // Sales cluster
+      'sales': ['lead generation', 'business development', 'revenue', 'customers', 'pipeline'],
+      'lead generation': ['sales', 'marketing', 'outreach', 'prospecting', 'demand generation'],
+      'business development': ['sales', 'partnerships', 'growth', 'revenue', 'clients'],
+
+      // Technical cluster
+      'tech': ['technology', 'software', 'development', 'engineering', 'it', 'technical'],
+      'software': ['tech', 'development', 'app', 'platform', 'saas', 'coding'],
+      'web development': ['tech', 'software', 'website', 'coding', 'programming', 'web design'],
+      'app development': ['tech', 'software', 'mobile', 'coding'],
+      'automation': ['tech', 'software', 'efficiency', 'tools', 'systems'],
+
+      // Financial cluster
+      'finance': ['accounting', 'bookkeeping', 'cfo', 'financial planning', 'capital'],
+      'funding': ['capital', 'investment', 'money', 'financing', 'fundraising'],
+      'investment': ['capital', 'funding', 'money', 'financing', 'venture'],
+
+      // Operational cluster
+      'operations': ['management', 'efficiency', 'process', 'logistics', 'systems'],
+      'logistics': ['operations', 'supply chain', 'shipping', 'delivery', 'distribution'],
+      'hiring': ['talent', 'recruitment', 'hr', 'staffing', 'team building'],
+      'talent': ['hiring', 'recruitment', 'team', 'employees', 'hr'],
+
+      // Strategic cluster
+      'strategy': ['planning', 'consulting', 'advisory', 'business strategy', 'growth strategy'],
+      'consulting': ['advisory', 'strategy', 'expertise', 'guidance'],
+      'partnerships': ['collaboration', 'alliances', 'business development', 'joint venture']
+    };
+
+    // Check if need and asset are in the same semantic cluster
+    const needLower = need.toLowerCase();
+    const assetLower = asset.toLowerCase();
+
+    for (const [key, synonyms] of Object.entries(keywords)) {
+      if ((needLower.includes(key) || synonyms.some(syn => needLower.includes(syn))) &&
+          (assetLower.includes(key) || synonyms.some(syn => assetLower.includes(syn)))) {
+        return true;
+      }
+    }
+
+    // Check for common business need patterns
+    const needPatterns = [
+      { need: /customer|client|lead/i, asset: /sales|marketing|business development|crm/i },
+      { need: /revenue|money|profit/i, asset: /sales|marketing|finance|pricing|monetization/i },
+      { need: /website|web|online/i, asset: /web|development|design|digital|tech/i },
+      { need: /brand|awareness|visibility/i, asset: /marketing|pr|social|media|branding/i },
+      { need: /scale|growth|expand/i, asset: /strategy|consulting|automation|systems|operations/i },
+      { need: /team|hire|talent/i, asset: /hr|recruitment|staffing|hiring/i },
+      { need: /legal|contract|compliance/i, asset: /law|attorney|legal/i },
+      { need: /capital|funding|money/i, asset: /investment|finance|funding|capital/i }
+    ];
+
+    for (const pattern of needPatterns) {
+      if (pattern.need.test(need) && pattern.asset.test(asset)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Check if member1's assets match member2's needs (with enhanced matching)
   for (const asset of member1Assets) {
     for (const need of member2Needs) {
-      if (asset.includes(need) || need.includes(asset)) {
+      if (matchesNeedAsset(need, asset)) {
         complementaryMatches++;
         matches.push(`Your "${asset}" addresses their need for "${need}"`);
       }
     }
   }
 
-  // Check if member2's assets match member1's needs
+  // Check if member2's assets match member1's needs (with enhanced matching)
   for (const asset of member2Assets) {
     for (const need of member1Needs) {
-      if (asset.includes(need) || need.includes(asset)) {
+      if (matchesNeedAsset(need, asset)) {
         complementaryMatches++;
         matches.push(`Their "${asset}" addresses your need for "${need}"`);
       }
     }
   }
 
+  // Also check constraint-to-asset matching (constraint often indicates deeper need)
+  const constraint1Lower = (member1.current_constraint || '').toLowerCase();
+  const constraint2Lower = (member2.current_constraint || '').toLowerCase();
+
+  if (constraint2Lower) {
+    for (const asset of member1Assets) {
+      if (matchesNeedAsset(constraint2Lower, asset)) {
+        complementaryMatches++;
+        matches.push(`Your "${asset}" can help solve their stated challenge: "${member2.current_constraint.substring(0, 50)}..."`);
+      }
+    }
+  }
+
+  if (constraint1Lower) {
+    for (const asset of member2Assets) {
+      if (matchesNeedAsset(constraint1Lower, asset)) {
+        complementaryMatches++;
+        matches.push(`Their "${asset}" can help solve your stated challenge: "${member1.current_constraint.substring(0, 50)}..."`);
+      }
+    }
+  }
+
   const maxComplementaryPoints = 20;
-  const complementaryPoints = Math.min(complementaryMatches * 5, maxComplementaryPoints);
+  const complementaryPoints = Math.min(complementaryMatches * 4, maxComplementaryPoints); // 4 points per match (was 5, adjusted for more matches)
   const complementaryCategory = {
     factor: 'Complementary Value Exchange',
     points: complementaryPoints,
@@ -310,10 +442,10 @@ function calculateMatchScore(member1, member2, similarity) {
     earned: complementaryPoints,
     percentage: Math.round((complementaryPoints / maxComplementaryPoints) * 100),
     description: complementaryPoints > 0
-      ? `${complementaryMatches} direct asset/need alignment${complementaryMatches > 1 ? 's' : ''} identified`
+      ? `${complementaryMatches} asset/need alignment${complementaryMatches > 1 ? 's' : ''} found through semantic analysis`
       : 'Potential for creative collaboration beyond explicit needs/assets',
     status: complementaryPoints > 12 ? 'strong' : complementaryPoints > 4 ? 'moderate' : 'exploratory',
-    details: matches.slice(0, 3)
+    details: matches.slice(0, 4) // Show up to 4 best matches
   };
   breakdown.push(complementaryCategory);
   fullBreakdown.push(complementaryCategory);
@@ -425,28 +557,102 @@ function calculateMatchScore(member1, member2, similarity) {
   totalScore += locationPoints;
 
   // ============================================================================
-  // 6. STRATEGIC GROWTH OPPORTUNITIES (0-5 points)
+  // 6. STRATEGIC GROWTH OPPORTUNITIES (0-5 points) - ENHANCED INSIGHTS
   // ============================================================================
   let strategyPoints = 0;
   const strategyInsights = [];
 
-  // Industry cross-pollination
+  // Industry cross-pollination with SPECIFIC strategic value
   const ind1 = (member1.industry || '').toLowerCase();
   const ind2 = (member2.industry || '').toLowerCase();
 
+  // Define specific cross-industry synergies (not generic!)
+  const crossIndustrySynergies = {
+    'technology-marketing': 'Tech can build tools marketing needs; Marketing can bring tech to market',
+    'technology-finance': 'Tech provides fintech innovation; Finance provides investment capital',
+    'technology-real estate': 'Tech enables PropTech solutions; Real estate provides distribution channels',
+    'marketing-real estate': 'Marketing drives property visibility; Real estate provides case studies',
+    'marketing-finance': 'Marketing drives client acquisition; Finance provides campaign capital',
+    'marketing-food & hospitality': 'Marketing fills seats/tables; F&B provides authentic brand stories',
+    'technology-food & hospitality': 'Tech streamlines operations/ordering; F&B provides user testing ground',
+    'real estate-legal': 'Real estate needs legal for transactions; Legal needs real estate clients',
+    'finance-legal': 'Finance needs legal for compliance; Legal needs finance for M&A deals',
+    'online education-marketing': 'Education needs student acquisition; Marketing needs training content',
+    'consulting-*': 'Consulting can analyze ANY business; Every business can provide consulting case studies'
+  };
+
   if (ind1 && ind2 && ind1 !== ind2) {
-    strategyPoints += 3;
-    strategyInsights.push(`Cross-industry innovation: ${member1.industry} × ${member2.industry}`);
+    const pair1 = `${ind1}-${ind2}`.toLowerCase();
+    const pair2 = `${ind2}-${ind1}`.toLowerCase();
+    const wildcard1 = `${ind1}-*`.toLowerCase();
+    const wildcard2 = `${ind2}-*`.toLowerCase();
+
+    let synergyFound = false;
+    if (crossIndustrySynergies[pair1]) {
+      strategyInsights.push(`${member1.industry} × ${member2.industry}: ${crossIndustrySynergies[pair1]}`);
+      strategyPoints += 3;
+      synergyFound = true;
+    } else if (crossIndustrySynergies[pair2]) {
+      strategyInsights.push(`${member1.industry} × ${member2.industry}: ${crossIndustrySynergies[pair2]}`);
+      strategyPoints += 3;
+      synergyFound = true;
+    } else if (crossIndustrySynergies[wildcard1]) {
+      strategyInsights.push(`${member1.industry} advantage: ${crossIndustrySynergies[wildcard1]}`);
+      strategyPoints += 2;
+      synergyFound = true;
+    } else if (crossIndustrySynergies[wildcard2]) {
+      strategyInsights.push(`${member2.industry} advantage: ${crossIndustrySynergies[wildcard2]}`);
+      strategyPoints += 2;
+      synergyFound = true;
+    }
+
+    if (!synergyFound) {
+      // Generic cross-industry benefit (reduced from 3 to 1 point since not specific)
+      strategyInsights.push(`Cross-industry perspective: Each brings blind spots the other can illuminate`);
+      strategyPoints += 1;
+    }
   } else if (ind1 && ind2 && ind1 === ind2) {
+    // Same industry - specific value based on actual industry
+    const sameIndustryValue = {
+      'technology': 'Peer benchmarking on metrics, tech stack choices, and hiring strategies',
+      'marketing': 'Share what campaigns worked, avoid each other\'s mistakes, co-pitch large clients',
+      'real estate': 'Off-market deal sharing, co-investing opportunities, market intelligence',
+      'finance': 'Deal flow sharing, co-investment opportunities, risk mitigation strategies',
+      'consulting': 'Niche specialization referrals, subcontracting overflow work',
+      'food & hospitality': 'Supplier negotiations leverage, event cross-promotion, crisis management playbook',
+      'legal': 'Referrals for specialty areas, overflow capacity during busy seasons',
+      'online education': 'Course co-creation, student cross-promotion, platform technology sharing'
+    };
+
+    const industryValue = sameIndustryValue[ind1] || 'Industry peer insights, competitive intelligence, potential collaboration on shared challenges';
+    strategyInsights.push(`Same industry (${member1.industry}): ${industryValue}`);
     strategyPoints += 2;
-    strategyInsights.push(`Shared industry expertise in ${member1.industry}`);
   }
 
-  // Constraint as opportunity indicator
-  if ((member1.current_constraint && member2Assets.length > 0) ||
-      (member2.current_constraint && member1Assets.length > 0)) {
-    strategyPoints += 2;
-    strategyInsights.push('Potential constraint-solution partnerships');
+  // Constraint-solution strategic partnerships (SPECIFIC)
+  if (member1.current_constraint && member2Assets.length > 0) {
+    // Check if any of member2's assets could plausibly address member1's constraint
+    const constraint1Words = constraint1Lower.split(/\s+/);
+    const assetMatches = member2Assets.filter(asset =>
+      constraint1Words.some(word => word.length > 3 && asset.includes(word))
+    );
+
+    if (assetMatches.length > 0) {
+      strategyInsights.push(`Solution partnership: Their ${assetMatches[0]} may address your "${member1.current_constraint.substring(0, 40)}..." challenge`);
+      strategyPoints += 2;
+    }
+  }
+
+  if (member2.current_constraint && member1Assets.length > 0) {
+    const constraint2Words = constraint2Lower.split(/\s+/);
+    const assetMatches = member1Assets.filter(asset =>
+      constraint2Words.some(word => word.length > 3 && asset.includes(word))
+    );
+
+    if (assetMatches.length > 0) {
+      strategyInsights.push(`Value opportunity: Your ${assetMatches[0]} may address their "${member2.current_constraint.substring(0, 40)}..." challenge`);
+      strategyPoints += 2;
+    }
   }
 
   const maxStrategyPoints = 5;
@@ -457,9 +663,9 @@ function calculateMatchScore(member1, member2, similarity) {
     maxPoints: maxStrategyPoints,
     earned: strategyPoints,
     percentage: Math.round((strategyPoints / maxStrategyPoints) * 100),
-    description: 'Long-term strategic value and growth potential',
+    description: 'Specific long-term strategic value and growth potential based on industry synergies',
     status: strategyPoints >= 4 ? 'high-value' : strategyPoints >= 2 ? 'valuable' : 'exploratory',
-    insights: strategyInsights
+    insights: strategyInsights.length > 0 ? strategyInsights : ['Explore potential for industry knowledge transfer and network expansion']
   };
   breakdown.push(strategyCategory);
   fullBreakdown.push(strategyCategory);
@@ -887,66 +1093,204 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
   }
 });
 
-// Generate match rationale using OpenAI with advanced prompt engineering and web research
+// STAGE 1: Industry & Market Research
+async function researchIndustryContext(member1, member2) {
+  const industries = [member1.industry, member2.industry].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+
+  const systemPrompt = `You are a senior market research analyst and industry expert specializing in ${industries.join(' and ')}.
+
+Your expertise spans:
+- Current industry trends, challenges, and opportunities
+- Successful cross-industry partnerships and case studies
+- Market dynamics, competitive landscapes, and emerging technologies
+- Industry-specific pain points and growth strategies
+
+You have access to your full knowledge base including recent developments, news, and thought leadership in these sectors.`;
+
+  const userPrompt = `Conduct deep industry research for a high-value business networking match:
+
+**INDUSTRY 1: ${member1.industry}**
+Company Type: ${member1.org}
+Business Model: ${member1.rev_driver || 'Not specified'}
+Current Challenge: ${member1.current_constraint || 'Not specified'}
+Location: ${member1.city}
+
+**INDUSTRY 2: ${member2.industry}**
+Company Type: ${member2.org}
+Business Model: ${member2.rev_driver || 'Not specified'}
+Current Challenge: ${member2.current_constraint || 'Not specified'}
+Location: ${member2.city}
+
+**RESEARCH REQUIRED:**
+
+1. **Current Industry Trends (for EACH industry):**
+   - What are the TOP 3 transformative trends RIGHT NOW affecting ${member1.industry}?
+   - What are the TOP 3 transformative trends RIGHT NOW affecting ${member2.industry}?
+   - How do these trends create urgency or opportunity for businesses like ${member1.org} and ${member2.org}?
+
+2. **Industry-Specific Challenges & Solutions:**
+   - Given "${member1.current_constraint}" as a challenge in ${member1.industry}, what innovative solutions are emerging?
+   - Given "${member2.current_constraint}" as a challenge in ${member2.industry}, what innovative solutions are emerging?
+   - Are there technological, strategic, or operational breakthroughs either industry could learn from?
+
+3. **Cross-Industry Synergy Analysis:**
+   - Find 2-3 real-world examples of successful ${member1.industry} × ${member2.industry} partnerships
+   - What unique value does each industry bring to the other?
+   - What blind spots in ${member1.industry} can ${member2.industry} illuminate, and vice versa?
+
+4. **Geographic Market Intelligence:**
+   - What's unique about the ${member1.city} market for ${member1.industry} businesses?
+   ${member1.city !== member2.city ? `- What's unique about the ${member2.city} market for ${member2.industry} businesses?` : ''}
+   - ${member1.city === member2.city ? 'Same city advantage: What local collaboration opportunities exist?' : 'Cross-market opportunity: How can geographic diversity create value?'}
+
+5. **Peripheral Opportunities (CRITICAL - Think Creatively):**
+   - Beyond obvious collaborations, what UNEXPECTED synergies exist between these industries?
+   - What adjacent problems could each solve for the other that they might not realize?
+   - What network effects or 3-way partnerships could emerge from this connection?
+
+Return as JSON with keys: industry1_trends, industry2_trends, cross_industry_examples, market_intelligence, peripheral_opportunities`;
+
+  console.log(`   📊 STAGE 1: Researching ${member1.industry} and ${member2.industry} market dynamics...`);
+
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: 'gpt-4o', // Use most capable model for research
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000, // Extended for comprehensive research
+      response_format: { type: 'json_object' }
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Industry research timeout after 60 seconds')), 60000)
+    )
+  ]);
+
+  return JSON.parse(response.choices[0].message.content);
+}
+
+// STAGE 2: Company & Individual Deep Dive
+async function researchCompaniesAndPeople(member1, member2) {
+  const systemPrompt = `You are an investigative business researcher with access to your complete knowledge base.
+
+Your mission: Uncover every piece of relevant information about these companies and individuals to enable the most valuable networking introduction possible.
+
+Search your knowledge for:
+- Company news, press releases, funding rounds, acquisitions
+- Individual achievements, awards, media appearances, published work
+- Social media presence, thought leadership, speaking engagements
+- Product launches, partnerships, market positioning
+- Any public recognition, rankings, or notable accomplishments
+
+If you don't know them specifically, infer from their industry, role, and business model what's likely true about their challenges and opportunities.`;
+
+  const userPrompt = `Research these two business professionals for a networking match:
+
+**PERSON 1: ${member1.name}**
+Organization: ${member1.org}
+Role: ${member1.role}
+Industry: ${member1.industry}
+What They Do: ${member1.rev_driver || 'Not specified'}
+Challenge: ${member1.current_constraint || 'Not specified'}
+Assets: ${member1.assets || 'Not specified'}
+Needs: ${member1.needs || 'Not specified'}
+Notable: ${member1.fun_fact || 'Not specified'}
+
+**PERSON 2: ${member2.name}**
+Organization: ${member2.org}
+Role: ${member2.role}
+Industry: ${member2.industry}
+What They Do: ${member2.rev_driver || 'Not specified'}
+Challenge: ${member2.current_constraint || 'Not specified'}
+Assets: ${member2.assets || 'Not specified'}
+Needs: ${member2.needs || 'Not specified'}
+Notable: ${member2.fun_fact || 'Not specified'}
+
+**RESEARCH TASKS:**
+
+1. **Company Intelligence:**
+   - What do you know about ${member1.org}? (news, reputation, market position, known achievements)
+   - What do you know about ${member2.org}? (news, reputation, market position, known achievements)
+   - If you don't have specific knowledge, what can you INFER from their business model and industry?
+
+2. **Individual Credibility:**
+   - What validates ${member1.name}'s expertise? (Look for clues in fun facts like TV shows, awards, growth numbers)
+   - What validates ${member2.name}'s expertise? (Look for clues in fun facts like TV shows, awards, growth numbers)
+   - Are there any impressive achievements mentioned that should be amplified?
+
+3. **Business Model Analysis:**
+   - Deep dive: How does "${member1.rev_driver}" actually work as a revenue model? What are the typical challenges?
+   - Deep dive: How does "${member2.rev_driver}" actually work as a revenue model? What are the typical challenges?
+   - What strategic dependencies or opportunities exist in each model?
+
+4. **Complementary Value Identification:**
+   - How specifically do ${member2.name}'s stated assets ("${member2.assets}") solve ${member1.name}'s stated needs ("${member1.needs}")?
+   - How specifically do ${member1.name}'s stated assets ("${member1.assets}") solve ${member2.name}'s stated needs ("${member2.needs}")?
+   - What LATENT assets does each have that the other might not realize are valuable?
+
+5. **Hidden Connections:**
+   - Based on roles, industries, locations, and backgrounds, what shared experiences might they have?
+   - What mutual connections, parallel career paths, or similar challenges create common ground?
+   - Any timing-based serendipity? (e.g., both scaling, both pivoting, both entering new markets)
+
+Return as JSON with keys: company1_intel, company2_intel, credibility_factors, business_model_insights, value_exchange, hidden_connections`;
+
+  console.log(`   🔍 STAGE 2: Deep-diving into ${member1.org} and ${member2.org}...`);
+
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.8, // Higher creativity for making connections
+      max_tokens: 2000,
+      response_format: { type: 'json_object' }
+    }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Company research timeout after 60 seconds')), 60000)
+    )
+  ]);
+
+  return JSON.parse(response.choices[0].message.content);
+}
+
+// STAGE 3: Strategic Match Synthesis & Introduction Generation
 async function generateMatchRationale(member1, member2, useGPT4 = false) {
   try {
-    // Build RICH industry-specific expert persona with strategic context
-    const industries = [member1.industry, member2.industry].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i); // unique
+    // STAGE 1: Industry Research
+    const industryResearch = await researchIndustryContext(member1, member2);
+    console.log(`   ✅ Stage 1 complete: Industry intelligence gathered`);
 
-    // Industry-specific language patterns and success metrics
-    const getIndustryContext = (industry) => {
-      const contexts = {
-        'Technology': 'You understand CAC, LTV, ARR, churn metrics, product-market fit, and tech stack decisions.',
-        'Digital Marketing': 'You speak fluently about CTR, ROAS, conversion funnels, attribution models, and content strategy.',
-        'Real Estate': 'You know cap rates, NOI, market cycles, zoning, and the importance of location-based networks.',
-        'Finance': 'You understand deal structuring, due diligence, portfolio diversification, and risk mitigation.',
-        'E-commerce': 'You know inventory turnover, AOV, conversion optimization, logistics, and marketplace dynamics.',
-        'Legal Services': 'You understand billable hours, retainer models, case law, regulatory compliance, and client acquisition.',
-        'Food & Hospitality': 'You know food cost percentages, table turns, labor management, and the power of local reputation.',
-        'Beauty': 'You understand customer retention, service-based revenue, product lines, and franchise economics.',
-        'Online Education': 'You know course completion rates, student lifetime value, community engagement, and scalable learning platforms.',
-        'Consulting': 'You understand value-based pricing, thought leadership, referral networks, and outcome-driven engagements.',
-        'Media': 'You know audience metrics, content distribution, monetization models, and platform algorithms.'
-      };
-      return contexts[industry] || `You understand ${industry} business models, key metrics, and growth drivers.`;
-    };
+    // STAGE 2: Company Research
+    const companyResearch = await researchCompaniesAndPeople(member1, member2);
+    console.log(`   ✅ Stage 2 complete: Company & individual intelligence gathered`);
 
-    const industryContexts = industries.map(ind => getIndustryContext(ind)).join(' ');
-    const crossIndustryNote = industries.length > 1
-      ? `\n\n🔥 CROSS-INDUSTRY ADVANTAGE: You recognize that ${member1.industry}-to-${member2.industry} connections often create breakthrough opportunities because each brings blind spots the other can illuminate.`
-      : '';
+    // STAGE 3: Synthesize into actionable networking introduction
+    console.log(`   🎯 STAGE 3: Synthesizing research into strategic introduction...`);
 
-    // Role/seniority awareness for appropriate tone
-    const roleContext = (member1.role && member2.role)
-      ? `\nCONTEXT: ${member1.role} meeting ${member2.role} - calibrate your tone to match peer, mentor, or partnership dynamics appropriately.`
-      : '';
+    const industries = [member1.industry, member2.industry].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
-    const systemPrompt = `You are a composite expert persona combining:
-1. **Master Business Networking Strategist** - 20+ years connecting executives and entrepreneurs at Rotary, YPO, and Vistage
-2. **${member1.industry || 'Business'} Industry Expert** - Deep operational knowledge of how ${member1.org} type businesses succeed
-3. **${member2.industry || 'Business'} Industry Specialist** - Intimate understanding of ${member2.org}'s market dynamics
-4. **Market Intelligence Analyst** - Equipped with recent news, trends, and company developments
+    const systemPrompt = `You are acting as a MASTER OF EXPERTISE in ${industries.join(' AND ')} industries AND in business networking strategy.
 
-${industryContexts}${crossIndustryNote}${roleContext}
+You are NOT a generic networking advisor. You are a recognized expert who:
+- Understands the operational realities, metrics, and success patterns in ${member1.industry}
+- Knows the market dynamics, challenges, and opportunities in ${member2.industry}
+- Has facilitated hundreds of high-value introductions between ${industries.length > 1 ? 'cross-industry' : 'peer'} professionals
+- Thinks strategically about BOTH obvious AND peripheral collaboration opportunities
 
-🎯 CORE PHILOSOPHY: Every business professional has networking potential. This match has been scored using a 6-category system:
-1. Universal Business Potential (30 pts baseline) - All entrepreneurs share common ground
-2. Semantic Profile Similarity (0-20 pts) - AI embedding analysis
-3. Complementary Value Exchange (0-20 pts) - Direct asset/need matches
-4. Market Alignment (0-15 pts) - Inferred business model, scale, growth stage compatibility
-5. Geographic & Logistical Synergy (0-10 pts) - Local vs remote collaboration opportunities
-6. Strategic Growth Opportunities (0-5 pts) - Cross-industry innovation potential
-
-Your job is to articulate the SPECIFIC VALUE in THIS connection, regardless of score. Even "moderate" matches (40-60 pts) can yield breakthrough collaborations when approached strategically.
-
-YOUR MISSION: Create a personalized, research-backed networking introduction that speaks directly to ${member1.name} about why connecting with ${member2.name} from ${member2.org} will drive TANGIBLE BUSINESS VALUE.
+You have just completed deep research on this match (provided below). Your job is to synthesize that research into a compelling, personalized networking introduction.
 
 CRITICAL VOICE & TONE REQUIREMENTS:
 - Speak TO ${member1.name} in second person ("you", "your business", "your team")
 - Speak ABOUT ${member2.name} in third person ("they", "their company", "${member2.name}", "${member2.org}")
 - Be conversational yet professional - like a trusted advisor over coffee
-- Show genuine enthusiasm backed by concrete reasoning
-- Reference SPECIFIC details from profiles - names, numbers, achievements
+- Show genuine enthusiasm backed by concrete reasoning from your research
+- Reference SPECIFIC details - names, numbers, achievements, research findings
+- NO GENERIC ADVICE - every sentence should reference actual research about THESE specific people/companies
 
 🔍 REQUIRED RESEARCH - Access Your Full Knowledge Base:
 **STEP 1: Research Both Parties**
@@ -989,110 +1333,101 @@ CRITICAL VOICE & TONE REQUIREMENTS:
 
 💡 **CRITICAL**: Your analysis MUST include BOTH direct AND creative connections. Show the obvious value AND the non-obvious strategic potential.`;
 
-    const userPrompt = `You're preparing ${member1.name} for a high-value networking introduction. Analyze this match and create a compelling briefing:
+    const userPrompt = `You're preparing ${member1.name} for a high-value networking introduction. Below is ALL the research you've gathered. Synthesize it into a compelling, actionable briefing.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 WHO YOU ARE (${member1.name})
+📊 STAGE 1 RESEARCH: INDUSTRY & MARKET INTELLIGENCE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Organization: ${member1.org}
-Your Role: ${member1.role}
-Industry: ${member1.industry}
-Based in: ${member1.city}
-
-💰 Business Model:
-   Revenue Driver: ${member1.rev_driver || 'Not disclosed'}
-   Current Challenge: ${member1.current_constraint || 'Not disclosed'}
-
-🎯 What You Bring to the Table:
-   ${member1.assets || 'Not disclosed'}
-
-🔍 What You're Seeking:
-   ${member1.needs || 'Not disclosed'}
-
-🌟 MEMORABLE CONTEXT (Great conversation starter!):
-   ${member1.fun_fact || 'Not disclosed'}
+${JSON.stringify(industryResearch, null, 2)}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 WHO THEY ARE (Your Potential Match)
+🔍 STAGE 2 RESEARCH: COMPANY & INDIVIDUAL INTELLIGENCE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Name: ${member2.name}
-Organization: ${member2.org}
-Their Role: ${member2.role}
-Industry: ${member2.industry}
-Based in: ${member2.city}
+${JSON.stringify(companyResearch, null, 2)}
 
-💰 Their Business Model:
-   Revenue Driver: ${member2.rev_driver || 'Not disclosed'}
-   Current Challenge: ${member2.current_constraint || 'Not disclosed'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 PARTICIPANT PROFILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🎯 What They Bring:
-   ${member2.assets || 'Not disclosed'}
+**${member1.name}** (${member1.role} at ${member1.org})
+Industry: ${member1.industry} | Location: ${member1.city}
+Revenue Model: ${member1.rev_driver || 'Not disclosed'}
+Current Challenge: ${member1.current_constraint || 'Not disclosed'}
+Assets: ${member1.assets || 'Not disclosed'}
+Needs: ${member1.needs || 'Not disclosed'}
+Notable: ${member1.fun_fact || 'Not disclosed'}
 
-🔍 What They're Seeking:
-   ${member2.needs || 'Not disclosed'}
-
-🌟 MEMORABLE CONTEXT (Use this as an icebreaker!):
-   ${member2.fun_fact || 'Not disclosed'}
-
-💡 PRO TIP: Fun facts are GOLD for opening conversations. If either person has an impressive or unusual story, USE IT in Approach #3!
+**${member2.name}** (${member2.role} at ${member2.org})
+Industry: ${member2.industry} | Location: ${member2.city}
+Revenue Model: ${member2.rev_driver || 'Not disclosed'}
+Current Challenge: ${member2.current_constraint || 'Not disclosed'}
+Assets: ${member2.assets || 'Not disclosed'}
+Needs: ${member2.needs || 'Not disclosed'}
+Notable: ${member2.fun_fact || 'Not disclosed'}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**🎯 YOUR TASK:**
+**🎯 YOUR SYNTHESIS TASK:**
 
-First, RESEARCH both parties using your knowledge base (companies, people, industries, trends). Then generate THREE components addressing ${member1.name} directly:
+Using ALL the research above, generate THREE components addressing ${member1.name} directly:
 
-**1. STRATEGIC RATIONALE** (3-5 sentences speaking directly to ${member1.name})
+**1. STRATEGIC RATIONALE** (4-6 sentences speaking directly to ${member1.name})
 - Start with "You should connect with ${member2.name} because..."
-- CITE RESEARCH: Reference any news, articles, achievements, social media presence, or industry reputation you know
-- Address DIRECT correlation: How do their assets explicitly solve your stated constraint?
-- Address CREATIVE correlation: What non-obvious synergies exist (latent assets, cross-pollination, network effects)?
-- Reference current industry trends making this connection timely
+- SYNTHESIZE YOUR RESEARCH: Weave together insights from industry trends, company intelligence, and credibility factors
+- Address DIRECT VALUE: How do their assets solve your stated constraint? Reference specific research findings.
+- Address PERIPHERAL OPPORTUNITIES: What non-obvious synergies did your research uncover? (latent assets, cross-pollination, network effects, adjacent problems)
+- CITE INDUSTRY TRENDS: Why is NOW the right time for this connection based on market dynamics?
+- Reference credibility factors from your research (achievements, media, growth numbers)
 - Quantify potential impact where possible (revenue, growth, market access)
 
-**2. UNIQUE COLLABORATION ANGLE** (2-3 sentences to ${member1.name})
-- Present a CREATIVE, non-obvious way you could work with ${member2.org}
-- This should go beyond simple transactional exchanges (not just "hire them")
-- Consider: joint ventures, co-marketing, knowledge sharing, network introductions, complementary offerings
-- Reference specific assets, backgrounds, fun facts, or achievements
-- Make it memorable and intriguing - something they haven't thought of yet
+**2. UNIQUE COLLABORATION ANGLE** (3-4 sentences to ${member1.name})
+- Present a RESEARCH-BACKED, creative collaboration opportunity
+- This must go BEYOND simple transactional exchanges (not just "hire them")
+- Draw from your peripheral opportunities research and cross-industry examples
+- Consider: joint ventures, co-marketing, knowledge sharing, network introductions, complementary offerings, strategic partnerships
+- Reference SPECIFIC research insights: successful precedents, market gaps, timing advantages
+- Make it memorable and intriguing - something ${member1.name} wouldn't think of without your industry expertise
 
 **3. THREE CONVERSATION APPROACHES** (Write in second-person, giving ${member1.name} options)
-Format as a numbered list, each approach being 2-3 sentences with SPECIFIC details:
+Format as a numbered list, each approach being 3-4 sentences with SPECIFIC details from your research:
 
-Approach #1: [The Direct Value Pitch - Based on DIRECT Correlation]
-"You could open with... [specific conversation starter mentioning their stated constraint and how the match's stated assets solve it directly]..."
+Approach #1: [The Industry-Informed Value Pitch]
+"You could open by referencing [SPECIFIC INDUSTRY TREND from your research] and positioning how ${member2.name}'s expertise in [SPECIFIC ASSET] directly addresses your challenge with [SPECIFIC CONSTRAINT]. Mention that you're aware of [RESEARCH FINDING about their company/achievements] which validates their capability. This shows you've done your homework and understand the strategic value."
 
-Approach #2: [The Creative Collaboration - Based on CREATIVE Correlation]
-"You could take a strategic partnership angle by... [non-obvious opportunity - cross-pollination, latent assets, network effects, adjacent problem solving]..."
+Approach #2: [The Peripheral Opportunity Angle]
+"You could take an unexpected angle by proposing [SPECIFIC PERIPHERAL OPPORTUNITY from your research - must be creative/non-obvious]. Reference the [CROSS-INDUSTRY EXAMPLE or PRECEDENT] you researched, and explain how your [LATENT ASSET] combined with their [COMPLEMENTARY CAPABILITY] could create [SPECIFIC OUTCOME]. This demonstrates strategic thinking beyond the obvious."
 
-Approach #3: [The Personal Connection / Icebreaker - Based on RESEARCH & Fun Facts]
-"You could build instant rapport by... [MUST reference fun facts, impressive achievements from their background, or any research findings like awards/media/known achievements]..."
+Approach #3: [The Personal Connection & Credibility Builder]
+"You could build instant rapport by acknowledging [SPECIFIC FUN FACT or ACHIEVEMENT from their profile], connecting it to [RESEARCH FINDING about their industry reputation or known accomplishments]. Then pivot to [SHARED EXPERIENCE or PARALLEL CHALLENGE from your research]. This creates personal connection while establishing mutual respect."
 
-**CRITICAL REQUIREMENTS**:
+**ABSOLUTE REQUIREMENTS**:
 - Use "you/your" when addressing ${member1.name}
 - Use "they/their/${member2.name}/${member2.org}" when referring to the match
-- Be SPECIFIC - mention actual company names, roles, assets, constraints, and especially FUN FACTS
-- Approach #3 MUST incorporate fun facts as conversation starters if they're interesting
-- If fun facts mention impressive achievements (like "built $100M company" or "won awards"), treat them as major credibility builders
-- If you have ANY knowledge of these companies, individuals, or their achievements, reference it!
-- Make it feel like insider intelligence, not generic networking advice
+- EVERY SENTENCE must reference SPECIFIC RESEARCH FINDINGS from Stages 1 & 2
+- NO GENERIC STATEMENTS - if you didn't find specific research, say "While specific public information wasn't available, based on [industry/role/business model] we can infer..."
+- Treat fun facts as MAJOR CREDIBILITY SIGNALS - if they mention TV shows, awards, growth numbers, AMPLIFY THEM
+- Reference industry trends, cross-industry examples, market intelligence by name
+- Make ${member1.name} feel like they have insider intelligence
 
-**VOICE EXAMPLES**:
-✅ GOOD: "You could open by mentioning their impressive track record turning around 100+ businesses on The Profit..."
-❌ BAD: "They have experience in business consulting..."
+**RESEARCH-BACKED VOICE EXAMPLES**:
+✅ EXCELLENT: "Given the current trend toward AI-powered customer service in SaaS (which your research identified), ${member2.name}'s background building chatbot solutions that reduced support costs by 40% at ${member2.org} directly addresses your constraint around scaling customer success. Their appearance on TechCrunch validates their market positioning."
 
-✅ GOOD: "Given your constraint around marketing reach, their proven expertise scaling brands from $3M to $60M using YouTube is exactly what you need..."
-❌ BAD: "They can help with your marketing needs..."
+❌ GENERIC: "They can help with your customer service needs because they have experience in that area."
 
-Return as JSON with keys: rationale_ops, creative_angle, intro_basis`;
+✅ EXCELLENT: "Here's a peripheral opportunity your research uncovered: While ${member2.name} focuses on marketing, their investor network (mentioned in their fun fact about raising $5M) could be the backdoor to enterprise clients you're seeking. The precedent is Amazon-Salesforce partnership where marketing expertise led to strategic distribution."
 
-    // Choose model based on tier - GPT-4o has better research capabilities
-    const model = useGPT4 ? 'gpt-4o' : 'gpt-3.5-turbo';
+❌ GENERIC: "They might know people who could help your business."
 
-    console.log(`   🤖 Calling ${model} for match analysis...`);
+Return as JSON with keys: rationale_ops, creative_angle, intro_basis
+
+REMINDER: This is ${member1.name}'s personal briefing. Make them feel like they're getting million-dollar consulting advice based on deep research.`;
+
+    // Always use GPT-4o for Stage 3 synthesis - quality is critical
+    const model = 'gpt-4o';
+
+    console.log(`   🎯 Synthesizing with ${model} (Stage 3 of 3)...`);
     const response = await Promise.race([
       openai.chat.completions.create({
         model: model,
@@ -1100,12 +1435,12 @@ Return as JSON with keys: rationale_ops, creative_angle, intro_basis`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        temperature: 0.85, // Slightly higher for creativity while maintaining accuracy
-        max_tokens: 1500, // Sufficient for detailed three-part response
+        temperature: 0.9, // Higher creativity for finding peripheral opportunities
+        max_tokens: 3000, // Extended for comprehensive research-backed introduction (was 1500)
         response_format: { type: 'json_object' }
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), 60000)
+        setTimeout(() => reject(new Error('OpenAI API timeout after 90 seconds')), 90000) // Extended timeout for complex synthesis
       )
     ]);
 
@@ -1113,12 +1448,28 @@ Return as JSON with keys: rationale_ops, creative_angle, intro_basis`;
 
     // Validate response has required fields
     if (!result.rationale_ops || !result.creative_angle || !result.intro_basis) {
-      throw new Error('Incomplete AI response');
+      throw new Error('Incomplete AI response from Stage 3 synthesis');
     }
+
+    console.log(`   ✅ COMPLETE: 3-stage research pipeline finished successfully`);
+    console.log(`      └─ Generated research-backed introduction for ${member1.name} ↔ ${member2.name}`);
 
     return result;
   } catch (error) {
-    console.error('Rationale generation error:', error);
+    console.error(`   ❌ Multi-stage research failed:`, error.message);
+
+    // Identify which stage failed for debugging
+    if (error.message.includes('Industry research timeout')) {
+      console.error('      └─ STAGE 1 (Industry Research) timed out');
+    } else if (error.message.includes('Company research timeout')) {
+      console.error('      └─ STAGE 2 (Company Research) timed out');
+    } else if (error.message.includes('OpenAI API timeout')) {
+      console.error('      └─ STAGE 3 (Synthesis) timed out');
+    } else {
+      console.error('      └─ Error details:', error);
+    }
+
+    console.log(`   🔄 Falling back to simple rationale for ${member1.name} ↔ ${member2.name}`);
     // Fallback to simple rationale
     return generateSimpleRationale(member1, member2);
   }

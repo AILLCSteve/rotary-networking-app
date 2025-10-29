@@ -281,16 +281,22 @@
             matchesContainer.innerHTML = '';
             progressBox.classList.add('active');
 
-            // Progress simulation - estimated 15-30 seconds for 3 matches
+            // Progress simulation - estimated 30-60 seconds for 3 matches (3-stage research per match)
             let progress = 0;
             const progressSteps = [
-                { progress: 10, message: 'Analyzing your profile...' },
-                { progress: 25, message: 'Scoring all potential matches...' },
-                { progress: 40, message: 'Selecting top 3 candidates...' },
-                { progress: 55, message: 'Generating AI introduction for match 1/3...' },
-                { progress: 70, message: 'Generating AI introduction for match 2/3...' },
-                { progress: 85, message: 'Generating AI introduction for match 3/3...' },
-                { progress: 95, message: 'Finalizing your matches...' }
+                { progress: 8, message: 'Analyzing your profile...' },
+                { progress: 16, message: 'Scoring all potential matches...' },
+                { progress: 24, message: 'Selecting top 3 candidates...' },
+                { progress: 32, message: 'Match 1/3: Researching industry trends & market dynamics...' },
+                { progress: 40, message: 'Match 1/3: Deep-diving into company & individual backgrounds...' },
+                { progress: 48, message: 'Match 1/3: Synthesizing strategic introduction...' },
+                { progress: 56, message: 'Match 2/3: Researching industry trends & market dynamics...' },
+                { progress: 64, message: 'Match 2/3: Deep-diving into company & individual backgrounds...' },
+                { progress: 72, message: 'Match 2/3: Synthesizing strategic introduction...' },
+                { progress: 80, message: 'Match 3/3: Researching industry trends & market dynamics...' },
+                { progress: 88, message: 'Match 3/3: Deep-diving into company & individual backgrounds...' },
+                { progress: 94, message: 'Match 3/3: Synthesizing strategic introduction...' },
+                { progress: 98, message: 'Finalizing your research-backed matches...' }
             ];
 
             let stepIndex = 0;
@@ -301,7 +307,7 @@
                     progressMessage.textContent = step.message;
                     stepIndex++;
                 }
-            }, 3000); // Update every 3 seconds
+            }, 4000); // Update every 4 seconds (3-stage research is more thorough)
 
             try {
                 const response = await fetch(`/api/generate-top3/${memberId}`, {
@@ -349,16 +355,23 @@
             matchesContainer.innerHTML = '';
             progressBox.classList.add('active');
 
-            // Progress simulation - estimated 1-3 minutes for 10-15 matches
+            // Progress simulation - estimated 2-4 minutes for 10-20 matches (3-stage research per match)
             const progressSteps = [
-                { progress: 5, message: 'Analyzing your profile...' },
-                { progress: 15, message: 'Scoring all attendees...' },
-                { progress: 25, message: 'Excluding your Top 3 matches...' },
-                { progress: 35, message: 'Generating AI introductions (this may take 1-2 minutes)...' },
-                { progress: 50, message: 'Processing matches 1-5...' },
-                { progress: 65, message: 'Processing matches 6-10...' },
-                { progress: 80, message: 'Processing final matches...' },
-                { progress: 95, message: 'Finalizing all connections...' }
+                { progress: 3, message: 'Analyzing your profile...' },
+                { progress: 6, message: 'Scoring all attendees...' },
+                { progress: 9, message: 'Excluding your Top 3 matches...' },
+                { progress: 12, message: 'Deep research mode activated - this will take 2-4 minutes...' },
+                { progress: 20, message: 'Researching industry trends for matches 1-5...' },
+                { progress: 28, message: 'Deep-diving into companies & backgrounds (matches 1-5)...' },
+                { progress: 36, message: 'Synthesizing strategic introductions (matches 1-5)...' },
+                { progress: 44, message: 'Researching industry trends for matches 6-10...' },
+                { progress: 52, message: 'Deep-diving into companies & backgrounds (matches 6-10)...' },
+                { progress: 60, message: 'Synthesizing strategic introductions (matches 6-10)...' },
+                { progress: 68, message: 'Researching industry trends for matches 11-15...' },
+                { progress: 76, message: 'Deep-diving into companies & backgrounds (matches 11-15)...' },
+                { progress: 84, message: 'Synthesizing strategic introductions (matches 11-15)...' },
+                { progress: 92, message: 'Processing final matches with peripheral opportunity analysis...' },
+                { progress: 98, message: 'Finalizing all research-backed connections...' }
             ];
 
             let stepIndex = 0;
@@ -369,7 +382,7 @@
                     progressMessage.textContent = step.message;
                     stepIndex++;
                 }
-            }, 8000); // Update every 8 seconds (slower for longer process)
+            }, 10000); // Update every 10 seconds (3-stage research is comprehensive)
 
             try {
                 const response = await fetch(`/api/generate-brainstorm/${memberId}`, {

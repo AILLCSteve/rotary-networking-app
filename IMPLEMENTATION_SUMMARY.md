@@ -230,14 +230,19 @@ Total: 15+ files, ~3500+ lines of code (70% growth from initial implementation)
   - Better for production workloads
 - **Connection Pooling**: Configured for 20 max connections
 
-### AI: OpenAI API (UPGRADED)
+### AI: OpenAI API (MULTI-STAGE RESEARCH AUGMENTED GENERATION)
 - **Embeddings**: `text-embedding-3-small` (1536 dimensions, $0.00002/1K tokens)
-- **Content Generation**: `GPT-4o` for both Top 3 and Brainstorm (upgraded from GPT-3.5-turbo)
-  - **Rationale**: Significantly richer, more creative conversation starters
-  - **Cost Impact**: ~4x more expensive but worth it for quality networking
-- **Token Limits**: 1500 max tokens per intro (increased from 1200)
-- **Timeout Protection**: 60-second wrapper prevents hanging
-- **Cost**: ~$0.08-0.12 per attendee for all AI features (includes GPT-4o upgrade)
+- **3-Stage Research Pipeline**: Each match uses 3 separate GPT-4o calls for deep analysis
+  - **Stage 1 - Industry Research** (2000 tokens): Market trends, cross-industry precedents, geographic insights
+  - **Stage 2 - Company Research** (2000 tokens): Business intelligence, credibility factors, hidden connections
+  - **Stage 3 - Strategic Synthesis** (3000 tokens): Research-backed introduction with peripheral opportunities
+- **Industry-Specific Expertise**: Acts as "Master of Expertise in [Industry] AND business networking"
+- **Peripheral Opportunity Discovery**: Goes beyond obvious matches to find creative, non-obvious synergies
+- **Rationale**: Multi-stage RAG approach enables consulting-grade insights users wouldn't discover themselves
+- **Cost Impact**: ~12x more expensive than original GPT-3.5-turbo single-call, but provides professional-level analysis
+- **Token Limits**: 7000 total tokens per match (2000+2000+3000 across 3 stages)
+- **Timeout Protection**: 60-90 second timeouts per stage with intelligent fallback
+- **Cost**: ~$0.35-0.50 per attendee for all AI features (includes 3-stage RAG pipeline)
 
 ### Frontend: Vanilla JavaScript + Modern CSS
 - **Why**: No build process, instant updates, maximum compatibility
@@ -342,29 +347,45 @@ npm start  # Runs on http://localhost:3000
 - Multi-event support
 - Analytics dashboard
 
-## Cost Analysis (UPDATED FOR GPT-4o)
+## Cost Analysis (UPDATED FOR 3-STAGE RAG PIPELINE)
 
 ### For 100 Attendees
-- OpenAI API: ~$8-12 (includes GPT-4o for Top 3 + Brainstorm)
+- OpenAI API: ~$35-50 (includes 3-stage research pipeline with GPT-4o)
   - Embeddings: ~$0.20 (100 members × 1536 dims)
-  - Top 3 generation: ~$4-6 (100 members × 3 intros × GPT-4o)
-  - Brainstorm generation: ~$4-6 (100 members × ~15 intros × GPT-4o)
+  - Top 3 generation: ~$15-20 (100 members × 3 matches × 3 API calls × GPT-4o × 7K tokens)
+  - Brainstorm generation: ~$20-30 (100 members × ~15 matches × 3 API calls × GPT-4o × 7K tokens)
+  - **Note**: Each match = 3 separate research calls (Industry + Company + Synthesis)
 - Hosting (Render): Free tier sufficient for testing
 - Database (Neon): Free tier (0.5GB storage, 100 compute hours/month)
 - Domain (optional): ~$12/year
-- **Total**: ~$10-15 per event (100 attendees)
+- **Total**: ~$40-55 per event (100 attendees)
 
 ### Scaling Costs
-- 500 attendees: ~$40-60 AI costs
-- 1000 attendees: ~$80-120 AI costs
-- **Note**: GPT-4o is ~4x more expensive than GPT-3.5-turbo but provides significantly better quality
+- 500 attendees: ~$175-250 AI costs
+- 1000 attendees: ~$350-500 AI costs
+- **Note**: 3-stage RAG is ~12x more expensive than GPT-3.5-turbo single-call, but provides consulting-grade research
 - **Production Hosting**: Render paid tier ~$7/month (recommended for events >100 attendees)
 - **Database**: Neon scales automatically, pay-as-you-go beyond free tier
 
-### Cost Optimization Options
-- Use GPT-3.5-turbo for Brainstorm mode (save ~50% on AI costs)
-- Limit Brainstorm to top 10 matches instead of 20
-- Cache embeddings aggressively (already implemented)
+### Cost-Benefit Analysis
+**What You Get for 3× the API Costs:**
+- Industry-specific expertise (not generic networking advice)
+- Market trends and timing intelligence
+- Peripheral opportunity discovery (non-obvious synergies)
+- Company/individual research and credibility validation
+- Cross-industry precedent examples
+- Strategic growth insights users wouldn't think of themselves
+
+**Value Proposition**:
+- Professional consultants charge $200-500/hour for similar market research
+- Each attendee gets ~$50-100 worth of personalized business intelligence
+- ROI: One successful connection from better-researched intros pays for entire event
+
+### Cost Optimization Options (If Budget Constrained)
+- **Option 1**: Use 3-stage pipeline for Top 3 only, simple mode for Brainstorm (save ~60%)
+- **Option 2**: Limit Brainstorm to top 10 matches instead of 20 (save ~30%)
+- **Option 3**: Reduce Stage 1 & 2 token limits from 2000 to 1000 (save ~20%)
+- **Not Recommended**: Reverting to single-call mode loses the peripheral opportunity discovery that makes this system unique
 
 ## Performance Metrics (UPDATED)
 
