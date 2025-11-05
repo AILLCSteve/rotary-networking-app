@@ -7,6 +7,7 @@ const path = require('path');
 const OpenAI = require('openai');
 const crypto = require('crypto');
 const db = require('./db');
+const nexusV2 = require('./nexus-v2');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2546,9 +2547,106 @@ app.post('/api/admin/generate-all-embeddings', async (req, res) => {
   }
 });
 
+// ============================================================================
+// NEXUS V2 API ENDPOINTS
+// ============================================================================
+
+// Get all members for NEXUS V2 selector
+app.get('/api/v2/members', async (req, res) => {
+  try {
+    const members = await db.all('SELECT member_id, name, org, role, industry, city FROM members ORDER BY name');
+    res.json({ members });
+  } catch (error) {
+    console.error('Error fetching members for V2:', error);
+    res.status(500).json({ error: 'Failed to fetch members' });
+  }
+});
+
+// Generate NEXUS V2 match analysis
+app.post('/api/v2/generate-match', async (req, res) => {
+  try {
+    const { member1_id, member2_id } = req.body;
+
+    if (!member1_id || !member2_id) {
+      return res.status(400).json({ error: 'Both member IDs required' });
+    }
+
+    console.log(`\n🚀 NEXUS V2 Request: ${member1_id} ↔ ${member2_id}`);
+
+    // Fetch both members from database
+    const member1 = await db.get('SELECT * FROM members WHERE member_id = $1', [member1_id]);
+    const member2 = await db.get('SELECT * FROM members WHERE member_id = $1', [member2_id]);
+
+    if (!member1 || !member2) {
+      return res.status(404).json({ error: 'One or both members not found' });
+    }
+
+    // Run NEXUS V2 pipeline
+    const result = await nexusV2.generateNexusV2Match(member1, member2);
+
+    // Optionally save to database (new table: nexus_v2_matches)
+    try {
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS nexus_v2_matches (
+          id SERIAL PRIMARY KEY,
+          member1_id VARCHAR(255),
+          member2_id VARCHAR(255),
+          score INTEGER,
+          grade VARCHAR(10),
+          result JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(member1_id, member2_id)
+        )
+      `);
+
+      await db.run(`
+        INSERT INTO nexus_v2_matches (member1_id, member2_id, score, grade, result)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (member1_id, member2_id)
+        DO UPDATE SET score = $3, grade = $4, result = $5, created_at = CURRENT_TIMESTAMP
+      `, [member1_id, member2_id, result.score, result.grade, JSON.stringify(result)]);
+    } catch (dbError) {
+      console.warn('Failed to save V2 result to database:', dbError.message);
+      // Non-blocking - continue even if DB save fails
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('NEXUS V2 generation error:', error);
+    res.status(500).json({
+      error: 'Failed to generate NEXUS V2 match',
+      details: error.message
+    });
+  }
+});
+
+// Get previous NEXUS V2 match result
+app.get('/api/v2/match/:member1_id/:member2_id', async (req, res) => {
+  try {
+    const { member1_id, member2_id } = req.params;
+
+    const result = await db.get(
+      'SELECT * FROM nexus_v2_matches WHERE member1_id = $1 AND member2_id = $2 ORDER BY created_at DESC LIMIT 1',
+      [member1_id, member2_id]
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'No NEXUS V2 match found for these members' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching V2 match:', error);
+    res.status(500).json({ error: 'Failed to fetch match' });
+  }
+});
+
+// ============================================================================
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Make sure to run "npm run init-db" to initialize the database');
   console.log('Set OPENAI_API_KEY in .env file for AI features');
+  console.log('🚀 NEXUS V2 API available at /api/v2/*');
 });
