@@ -807,10 +807,46 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// ENHANCEMENT: Communication Style Analysis
+function analyzeCommunicationStyle(memberText) {
+  const text = (memberText || '').toLowerCase();
+
+  // Analyze writing style indicators
+  const indicators = {
+    analytical: /data|metric|roi|analyz|measur|kpi|benchmark|statistic/gi,
+    creative: /innovat|creativ|imagin|vision|disrupt|pioneer|unique|transform/gi,
+    direct: /straightforward|efficient|practical|simple|clear|direct|result/gi,
+    collaborative: /partner|together|collaborate|team|community|network|share|mutual/gi,
+    formal: /professional|corporate|enterprise|strategic|executive|official/gi,
+    casual: /love|passion|excited|awesome|cool|great|fun|enjoy/gi
+  };
+
+  const scores = {};
+  for (const [style, pattern] of Object.entries(indicators)) {
+    const matches = text.match(pattern) || [];
+    scores[style] = matches.length;
+  }
+
+  // Determine primary style
+  const primary = Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
+  const totalMatches = Object.values(scores).reduce((sum, val) => sum + val, 0);
+
+  return {
+    primary_style: totalMatches > 0 ? primary : 'balanced',
+    style_scores: scores,
+    formality_index: scores.formal / Math.max(scores.casual, 1),
+    collaboration_orientation: scores.collaborative + scores.creative
+  };
+}
+
 // Generate embedding for a member
 async function generateEmbedding(memberId) {
   try {
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
+
+    // ENHANCEMENT: Analyze communication style
+    const fullText = `${member.rev_driver} ${member.current_constraint} ${member.assets} ${member.needs} ${member.fun_fact}`;
+    const commStyle = analyzeCommunicationStyle(fullText);
 
     // Build RICH profile string for embedding - include everything for better semantic matching
     const profile = `
@@ -821,6 +857,7 @@ async function generateEmbedding(memberId) {
       What I Bring: ${member.assets || ''}
       What I Need: ${member.needs || ''}
       About Me: ${member.fun_fact || ''}
+      Communication Style: ${commStyle.primary_style}
     `.trim();
 
     // Generate embedding using OpenAI
@@ -831,14 +868,23 @@ async function generateEmbedding(memberId) {
 
     const embedding = response.data[0].embedding;
 
-    // Store embedding (PostgreSQL ON CONFLICT syntax)
+    // Store embedding with communication style metadata (PostgreSQL ON CONFLICT syntax)
     await db.run(`
       INSERT INTO vectors (member_id, embedding_ops)
       VALUES ($1, $2)
       ON CONFLICT (member_id) DO UPDATE SET embedding_ops = $2
     `, [memberId, JSON.stringify(embedding)]);
 
-    console.log(`✅ Embedding generated for ${member.name} (${member.org})`);
+    // Store communication style in members table if column exists
+    try {
+      await db.run(`UPDATE members SET communication_style = $1 WHERE member_id = $2`,
+        [JSON.stringify(commStyle), memberId]
+      );
+    } catch (e) {
+      // Column might not exist yet, that's okay
+    }
+
+    console.log(`✅ Embedding generated for ${member.name} (${member.org}) - Style: ${commStyle.primary_style}`);
   } catch (error) {
     console.error('Embedding generation error:', error);
   }
@@ -1040,7 +1086,10 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
           breakdown: match.breakdown, // Concise for display
           fullBreakdown: match.fullBreakdown, // Complete objective matrix
           summary: match.summary, // Grade and percentage
-          complementaryValueResearch // Store research findings for display
+          complementaryValueResearch, // Store research findings for display
+          confidence_score: rationale.confidence_score || null,  // ENHANCEMENT: Add confidence
+          ai_persona: rationale.ai_persona_used || 'Strategic Growth Advisor',  // ENHANCEMENT: Track AI persona
+          research_timestamp: new Date().toISOString()
         };
 
         await db.run(`
@@ -1199,7 +1248,10 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
           breakdown: match.breakdown, // Concise for display
           fullBreakdown: match.fullBreakdown, // Complete objective matrix
           summary: match.summary, // Grade and percentage
-          complementaryValueResearch // Store research findings for display
+          complementaryValueResearch, // Store research findings for display
+          confidence_score: rationale.confidence_score || null,  // ENHANCEMENT: Add confidence
+          ai_persona: rationale.ai_persona_used || 'Strategic Growth Advisor',  // ENHANCEMENT: Track AI persona
+          research_timestamp: new Date().toISOString()
         };
 
         await db.run(`
@@ -1302,9 +1354,69 @@ Return as JSON with keys: industry1_trends, industry2_trends, cross_industry_exa
   return JSON.parse(response.choices[0].message.content);
 }
 
+// STAGE 1.5: Real-Time Web Research (NEW!)
+async function conductWebResearch(member1, member2) {
+  console.log(`   🌐 STAGE 1.5: Conducting real-time web search for recent intel...`);
+
+  const searches = [];
+  const results = { member1_findings: [], member2_findings: [], partnership_precedents: [] };
+
+  try {
+    // Search for member 1's company
+    if (member1.org) {
+      searches.push(
+        WebSearch({
+          query: `${member1.org} ${member1.industry} news 2024 2025`,
+          description: 'Recent news about member 1 company'
+        }).then(r => results.member1_findings.push(`Company news: ${r}`)).catch(e => console.log(`   ⚠️  Web search failed for ${member1.org}`))
+      );
+    }
+
+    // Search for member 2's company
+    if (member2.org) {
+      searches.push(
+        WebSearch({
+          query: `${member2.org} ${member2.industry} news 2024 2025`,
+          description: 'Recent news about member 2 company'
+        }).then(r => results.member2_findings.push(`Company news: ${r}`)).catch(e => console.log(`   ⚠️  Web search failed for ${member2.org}`))
+      );
+    }
+
+    // Search for industry partnership examples
+    if (member1.industry && member2.industry && member1.industry !== member2.industry) {
+      searches.push(
+        WebSearch({
+          query: `${member1.industry} ${member2.industry} partnership collaboration case study`,
+          description: 'Cross-industry partnership precedents'
+        }).then(r => results.partnership_precedents.push(r)).catch(e => console.log(`   ⚠️  Partnership search failed`))
+      );
+    }
+
+    // Wait for all searches with 30-second timeout
+    await Promise.race([
+      Promise.allSettled(searches),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Web search timeout')), 30000))
+    ]);
+
+    console.log(`   ✅ STAGE 1.5 complete: Web research gathered (${results.member1_findings.length + results.member2_findings.length} findings)`);
+    return results;
+  } catch (error) {
+    console.log(`   ⚠️  STAGE 1.5 partial: Some web searches timed out, continuing with available data`);
+    return results;
+  }
+}
+
 // STAGE 2: Company & Individual Deep Dive
-async function researchCompaniesAndPeople(member1, member2) {
-  const systemPrompt = `You are an investigative business researcher with access to your complete knowledge base.
+async function researchCompaniesAndPeople(member1, member2, webResearchResults = null) {
+  const webContext = webResearchResults ? `
+
+🌐 REAL-TIME WEB RESEARCH FINDINGS (2024-2025):
+${JSON.stringify(webResearchResults, null, 2)}
+
+IMPORTANT: Prioritize these real-time findings over your training data when available.
+` : '';
+
+  const systemPrompt = `You are an investigative business researcher with access to your complete knowledge base AND real-time web search results.
 
 Your mission: Uncover every piece of relevant information about these companies and individuals to enable the most valuable networking introduction possible.
 
@@ -1314,6 +1426,8 @@ Search your knowledge for:
 - Social media presence, thought leadership, speaking engagements
 - Product launches, partnerships, market positioning
 - Any public recognition, rankings, or notable accomplishments
+
+${webContext}
 
 If you don't know them specifically, infer from their industry, role, and business model what's likely true about their challenges and opportunities.`;
 
@@ -1729,6 +1843,108 @@ ${JSON.stringify(companyResearch, null, 2)}
   }
 }
 
+// CONFIDENCE SCORING SYSTEM - Quantify reliability of AI insights
+function calculateConfidenceScore(industryResearch, companyResearch, complementaryValueResearch, verificationLog, webResearchResults) {
+  let dataQuality = 0;
+  let factCheckScore = 100;
+  let researchDepth = 0;
+
+  // 1. DATA QUALITY SCORE (0-40 points)
+  // Check richness of complementary value research
+  const creativeIdeas = complementaryValueResearch?.creative_collaboration_ideas?.length || 0;
+  dataQuality += Math.min(creativeIdeas * 5, 20); // Up to 20 points for creative ideas
+
+  // Check industry research depth
+  const industryInsights = JSON.stringify(industryResearch || {});
+  if (industryInsights.length > 500) dataQuality += 10;
+  else if (industryInsights.length > 200) dataQuality += 5;
+
+  // Check company research depth
+  const companyInsights = JSON.stringify(companyResearch || {});
+  if (companyInsights.length > 500) dataQuality += 10;
+  else if (companyInsights.length > 200) dataQuality += 5;
+
+  // 2. FACT-CHECK SCORE (deduct for removed claims)
+  if (verificationLog && verificationLog.length > 0) {
+    const removedClaims = verificationLog.filter(v => v.status === 'REMOVED').length;
+    const inferenceClaims = verificationLog.filter(v => v.status === 'INFERENCE').length;
+    factCheckScore -= (removedClaims * 10) + (inferenceClaims * 3);
+    factCheckScore = Math.max(factCheckScore, 0);
+  }
+
+  // 3. RESEARCH DEPTH SCORE (0-40 points)
+  researchDepth += industryResearch ? 15 : 0;
+  researchDepth += companyResearch ? 15 : 0;
+  researchDepth += webResearchResults && (webResearchResults.member1_findings.length + webResearchResults.member2_findings.length) > 0 ? 10 : 0;
+
+  // OVERALL CONFIDENCE (weighted average)
+  const overall = Math.round((dataQuality * 0.4) + (factCheckScore * 0.3) + (researchDepth * 0.3));
+
+  return {
+    overall: Math.min(overall, 100),
+    data_quality: dataQuality,
+    fact_check: factCheckScore,
+    research_depth: researchDepth,
+    rating: overall >= 80 ? 'High' : overall >= 60 ? 'Medium' : 'Moderate',
+    explanation: overall >= 80
+      ? 'High-confidence match backed by comprehensive research and verified facts'
+      : overall >= 60
+      ? 'Medium-confidence match with good research depth'
+      : 'Moderate-confidence match - recommendations based on available data'
+  };
+}
+
+// ADAPTIVE PERSONA SYSTEM - Different AI advisor styles for different matching contexts
+const AI_PERSONAS = {
+  strategic: {
+    name: 'Strategic Growth Advisor',
+    systemPrefix: 'You are a strategic business growth consultant with an MBA from Harvard and 20 years of C-suite experience.',
+    tone: 'analytical, data-driven, focused on ROI and scalability',
+    useCase: 'High-potential matches with clear strategic alignment'
+  },
+  creative: {
+    name: 'Innovation Catalyst',
+    systemPrefix: 'You are a creative collaboration strategist who has facilitated partnerships between Fortune 500 companies and disruptive startups.',
+    tone: 'imaginative, opportunity-focused, emphasizing non-obvious synergies',
+    useCase: 'Matches requiring creative collaboration ideas'
+  },
+  tactical: {
+    name: 'Practical Connector',
+    systemPrefix: 'You are a no-nonsense business connector who gets straight to the value proposition.',
+    tone: 'direct, actionable, focused on immediate wins',
+    useCase: 'Clear complementary need-asset matches'
+  },
+  mentor: {
+    name: 'Peer Mentor Advisor',
+    systemPrefix: 'You are a warm, experienced business mentor who has guided hundreds of entrepreneurs through growth challenges.',
+    tone: 'supportive, experiential, focused on learning and mutual growth',
+    useCase: 'Matches with significant experience/maturity gaps'
+  }
+};
+
+// Select best persona based on match characteristics
+function selectAIPersona(member1, member2, complementaryValueResearch) {
+  const creativeIdeasCount = complementaryValueResearch?.creative_collaboration_ideas?.length || 0;
+  const directMatches = complementaryValueResearch?.direct_matches || '';
+  const hasDirectMatch = typeof directMatches === 'string' && directMatches.length > 20;
+
+  // Creative persona: High creative collaboration potential
+  if (creativeIdeasCount >= 4) return AI_PERSONAS.creative;
+
+  // Tactical persona: Clear direct matches
+  if (hasDirectMatch && creativeIdeasCount < 2) return AI_PERSONAS.tactical;
+
+  // Mentor persona: Experience gap (founder vs non-founder)
+  const role1 = (member1.role || '').toLowerCase();
+  const role2 = (member2.role || '').toLowerCase();
+  const isFounder1 = role1.includes('founder') || role1.includes('ceo') || role1.includes('owner');
+  const isFounder2 = role2.includes('founder') || role2.includes('ceo') || role2.includes('owner');
+  if (isFounder1 !== isFounder2) return AI_PERSONAS.mentor;
+
+  // Default: Strategic for high-value matches
+  return AI_PERSONAS.strategic;
+}
+
 // MULTI-STAGE RESEARCH PIPELINE ORCHESTRATOR
 // Runs Stages 1-4: Industry Research → Company Research → Strategic Synthesis → Fact-Checking
 // (Stage 0: Complementary Value Research is passed in as a parameter)
@@ -1738,16 +1954,25 @@ async function generateMatchRationale(member1, member2, complementaryValueResear
     const industryResearch = await researchIndustryContext(member1, member2);
     console.log(`   ✅ Stage 1 complete: Industry intelligence gathered`);
 
-    // STAGE 2: Company Research
-    const companyResearch = await researchCompaniesAndPeople(member1, member2);
+    // STAGE 1.5: Real-Time Web Research (NEW!)
+    const webResearchResults = await conductWebResearch(member1, member2);
+
+    // STAGE 2: Company Research (now with web research)
+    const companyResearch = await researchCompaniesAndPeople(member1, member2, webResearchResults);
     console.log(`   ✅ Stage 2 complete: Company & individual intelligence gathered`);
 
     // STAGE 3: Synthesize into actionable networking introduction
     console.log(`   🎯 STAGE 3: Synthesizing research into strategic introduction...`);
 
+    // SELECT ADAPTIVE PERSONA based on match characteristics
+    const selectedPersona = selectAIPersona(member1, member2, complementaryValueResearch);
+    console.log(`   🎭 Using AI Persona: ${selectedPersona.name} (${selectedPersona.tone})`);
+
     const industries = [member1.industry, member2.industry].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
-    const systemPrompt = `You are acting as a MASTER OF EXPERTISE in ${industries.join(' AND ')} industries AND in business networking strategy.
+    const systemPrompt = `${selectedPersona.systemPrefix}
+
+You are acting as a MASTER OF EXPERTISE in ${industries.join(' AND ')} industries AND in business networking strategy.
 
 You are NOT a generic networking advisor. You are a recognized expert who:
 - Understands the operational realities, metrics, and success patterns in ${member1.industry}
@@ -1955,7 +2180,22 @@ REMINDER: This is ${member1.name}'s personal briefing. Make them feel like they'
     console.log(`   ✅ COMPLETE: 5-stage research pipeline finished successfully`);
     console.log(`      └─ Generated fact-checked, research-backed introduction for ${member1.name} ↔ ${member2.name}`);
 
-    return factCheckedResult;
+    // ENHANCEMENT: Add confidence scoring based on research depth
+    const confidenceScore = calculateConfidenceScore(
+      industryResearch,
+      companyResearch,
+      complementaryValueResearch,
+      factCheckedResult.verification_log,
+      webResearchResults
+    );
+
+    console.log(`   📊 Confidence Score: ${confidenceScore.overall}% (Data: ${confidenceScore.data_quality}, Verification: ${confidenceScore.fact_check})`);
+
+    return {
+      ...factCheckedResult,
+      confidence_score: confidenceScore,
+      ai_persona_used: selectedPersona.name
+    };
   } catch (error) {
     console.error(`   ❌ Multi-stage research failed:`, error.message);
 
