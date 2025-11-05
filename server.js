@@ -8,6 +8,7 @@ const OpenAI = require('openai');
 const crypto = require('crypto');
 const db = require('./db');
 const nexusV2 = require('./nexus-v2');
+const nexusV35 = require('./nexus-v3.5');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2642,11 +2643,182 @@ app.get('/api/v2/match/:member1_id/:member2_id', async (req, res) => {
 });
 
 // ============================================================================
+// NEXUS V3.5+ API ENDPOINTS
+// ============================================================================
+
+// Get all members for NEXUS V3.5+ selector
+app.get('/api/v3.5/members', async (req, res) => {
+  try {
+    const members = await db.all('SELECT member_id, name, org, role, industry, city FROM members ORDER BY name');
+    res.json({ members });
+  } catch (error) {
+    console.error('Error fetching members for V3.5+:', error);
+    res.status(500).json({ error: 'Failed to fetch members' });
+  }
+});
+
+// SSE Streaming endpoint for NEXUS V3.5+
+app.get('/api/v3.5/stream-match/:member1_id/:member2_id', async (req, res) => {
+  try {
+    const { member1_id, member2_id } = req.params;
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    console.log(`\n🌊 NEXUS V3.5+ SSE Stream: ${member1_id} ↔ ${member2_id}`);
+
+    // Fetch both members
+    const member1 = await db.get('SELECT * FROM members WHERE member_id = $1', [member1_id]);
+    const member2 = await db.get('SELECT * FROM members WHERE member_id = $1', [member2_id]);
+
+    if (!member1 || !member2) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'One or both members not found' })}\n\n`);
+      return res.end();
+    }
+
+    // SSE emit function
+    const emit = (event) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    // Run NEXUS V3.5+ pipeline with streaming
+    const result = await nexusV35.generateMatch(member1, member2, emit);
+
+    // Save to database
+    try {
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS nexus_v35_matches (
+          id SERIAL PRIMARY KEY,
+          member1_id VARCHAR(255),
+          member2_id VARCHAR(255),
+          score INTEGER,
+          grade VARCHAR(10),
+          result JSONB,
+          semantic_cache_hit BOOLEAN DEFAULT FALSE,
+          processing_time NUMERIC,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(member1_id, member2_id)
+        )
+      `);
+
+      await db.run(`
+        INSERT INTO nexus_v35_matches (member1_id, member2_id, score, grade, result, semantic_cache_hit, processing_time)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (member1_id, member2_id)
+        DO UPDATE SET score = $3, grade = $4, result = $5, semantic_cache_hit = $6, processing_time = $7, created_at = CURRENT_TIMESTAMP
+      `, [member1_id, member2_id, result.score, result.grade, JSON.stringify(result), result.semantic_cache_hit, result.processing_time]);
+    } catch (dbError) {
+      console.warn('Failed to save V3.5+ result to database:', dbError.message);
+    }
+
+    res.end();
+  } catch (error) {
+    console.error('NEXUS V3.5+ streaming error:', error);
+    try {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+      res.end();
+    } catch (e) {
+      // Response already closed
+    }
+  }
+});
+
+// Regular (non-streaming) endpoint for NEXUS V3.5+
+app.post('/api/v3.5/generate-match', async (req, res) => {
+  try {
+    const { member1_id, member2_id } = req.body;
+
+    if (!member1_id || !member2_id) {
+      return res.status(400).json({ error: 'Both member IDs required' });
+    }
+
+    console.log(`\n🚀 NEXUS V3.5+ Request: ${member1_id} ↔ ${member2_id}`);
+
+    const member1 = await db.get('SELECT * FROM members WHERE member_id = $1', [member1_id]);
+    const member2 = await db.get('SELECT * FROM members WHERE member_id = $1', [member2_id]);
+
+    if (!member1 || !member2) {
+      return res.status(404).json({ error: 'One or both members not found' });
+    }
+
+    // Run NEXUS V3.5+ pipeline without streaming
+    const result = await nexusV35.generateMatch(member1, member2);
+
+    // Save to database
+    try {
+      await db.run(`
+        CREATE TABLE IF NOT EXISTS nexus_v35_matches (
+          id SERIAL PRIMARY KEY,
+          member1_id VARCHAR(255),
+          member2_id VARCHAR(255),
+          score INTEGER,
+          grade VARCHAR(10),
+          result JSONB,
+          semantic_cache_hit BOOLEAN DEFAULT FALSE,
+          processing_time NUMERIC,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(member1_id, member2_id)
+        )
+      `);
+
+      await db.run(`
+        INSERT INTO nexus_v35_matches (member1_id, member2_id, score, grade, result, semantic_cache_hit, processing_time)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (member1_id, member2_id)
+        DO UPDATE SET score = $3, grade = $4, result = $5, semantic_cache_hit = $6, processing_time = $7, created_at = CURRENT_TIMESTAMP
+      `, [member1_id, member2_id, result.score, result.grade, JSON.stringify(result), result.semantic_cache_hit, result.processing_time]);
+    } catch (dbError) {
+      console.warn('Failed to save V3.5+ result to database:', dbError.message);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('NEXUS V3.5+ generation error:', error);
+    res.status(500).json({
+      error: 'Failed to generate NEXUS V3.5+ match',
+      details: error.message
+    });
+  }
+});
+
+// Get previous NEXUS V3.5+ match result
+app.get('/api/v3.5/match/:member1_id/:member2_id', async (req, res) => {
+  try {
+    const { member1_id, member2_id } = req.params;
+
+    const result = await db.get(
+      'SELECT * FROM nexus_v35_matches WHERE member1_id = $1 AND member2_id = $2 ORDER BY created_at DESC LIMIT 1',
+      [member1_id, member2_id]
+    );
+
+    if (!result) {
+      return res.status(404).json({ error: 'No NEXUS V3.5+ match found for these members' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching V3.5+ match:', error);
+    res.status(500).json({ error: 'Failed to fetch match' });
+  }
+});
+
+// ============================================================================
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on port ${PORT}`);
   console.log('Make sure to run "npm run init-db" to initialize the database');
   console.log('Set OPENAI_API_KEY in .env file for AI features');
   console.log('🚀 NEXUS V2 API available at /api/v2/*');
+  console.log('⚡ NEXUS V3.5+ API available at /api/v3.5/* (with SSE streaming)');
+
+  // Initialize Thompson Sampling stats
+  try {
+    await nexusV35.initializeThompsonStats();
+  } catch (err) {
+    console.log('⚠️  Thompson stats initialization skipped (will initialize on first use)');
+  }
 });

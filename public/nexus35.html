@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXUS V3.5+ - Streaming AI Matchmaking</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .nexus35-header {
+            background: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #8b5cf6 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            color: white;
+            text-align: center;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+        }
+
+        .nexus35-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .nexus35-header .subtitle {
+            margin-top: 0.5rem;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .streaming-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-top: 1rem;
+        }
+
+        .pulse-dot {
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+
+        .layer-progress {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .layer-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .layer-card.pending {
+            border-color: #d1d5db;
+            opacity: 0.6;
+        }
+
+        .layer-card.in-progress {
+            border-color: #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+            animation: shimmer 2s ease-in-out infinite;
+        }
+
+        .layer-card.complete {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+
+        @keyframes shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+
+        .layer-card h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .layer-card .status {
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .score-display {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+            border: 3px solid #f97316;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 2rem 0;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.2);
+        }
+
+        .score-value {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #ea580c;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .score-grade {
+            font-size: 2rem;
+            color: #9a3412;
+            margin-top: 0.5rem;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 30px;
+            background: #e5e7eb;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .agent-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            opacity: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .agent-card.completed {
+            opacity: 1;
+            border-color: #10b981;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .agent-name {
+            font-weight: bold;
+            color: #111827;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-score {
+            font-size: 1.5rem;
+            color: #3b82f6;
+        }
+
+        .cache-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f0fdf4;
+            border: 2px solid #10b981;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: bold;
+            color: #065f46;
+        }
+
+        .cache-indicator.miss {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nexus35-header">
+            <h1>⚡ NEXUS V3.5+</h1>
+            <p class="subtitle">Stratified Mixture-of-Experts with Real-Time Streaming</p>
+            <div class="streaming-indicator">
+                <div class="pulse-dot"></div>
+                <span>Live AI Streaming Enabled</span>
+            </div>
+        </div>
+
+        <!-- Member Selection -->
+        <div class="card">
+            <h2>Select Members to Analyze</h2>
+            <div class="member-selector" style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center;">
+                <div>
+                    <label for="member1">Member 1</label>
+                    <select id="member1" class="form-control" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 2px solid #d1d5db;">
+                        <option value="">Loading members...</option>
+                    </select>
+                </div>
+                <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">↔</div>
+                <div>
+                    <label for="member2">Member 2</label>
+                    <select id="member2" class="form-control" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 2px solid #d1d5db;">
+                        <option value="">Loading members...</option>
+                    </select>
+                </div>
+            </div>
+            <button id="analyzeBtn" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem; padding: 1rem; font-size: 1.1rem; background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); border: none; cursor: pointer;">
+                🚀 Start Streaming Analysis
+            </button>
+        </div>
+
+        <!-- Semantic Cache Indicator -->
+        <div id="cacheIndicator" style="display: none;"></div>
+
+        <!-- Layer Progress -->
+        <div id="layerProgress" style="display: none;">
+            <h3>Pipeline Progress</h3>
+            <div class="layer-progress">
+                <div class="layer-card pending" id="layer0">
+                    <h4>L0: Extract Features</h4>
+                    <div class="status">Pending...</div>
+                </div>
+                <div class="layer-card pending" id="layer1">
+                    <h4>L1: Semantic Cache</h4>
+                    <div class="status">Pending...</div>
+                </div>
+                <div class="layer-card pending" id="layer2">
+                    <h4>L2: Micro-Agents</h4>
+                    <div class="status">Pending...</div>
+                </div>
+                <div class="layer-card pending" id="layer3">
+                    <h4>L3: Aggregation</h4>
+                    <div class="status">Pending...</div>
+                </div>
+                <div class="layer-card pending" id="layer4">
+                    <h4>L4: Adjudication</h4>
+                    <div class="status">Pending...</div>
+                </div>
+                <div class="layer-card pending" id="layer5">
+                    <h4>L5: Scoring</h4>
+                    <div class="status">Pending...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Progress -->
+        <div id="agentSection" style="display: none;">
+            <h3>Micro-Agent Analysis</h3>
+            <div id="agentGrid" class="agent-grid"></div>
+        </div>
+
+        <!-- Score Display -->
+        <div id="scoreSection" style="display: none;">
+            <div class="score-display">
+                <div class="score-value" id="scoreValue">--</div>
+                <div class="score-grade" id="scoreGrade">Analyzing...</div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" id="confidenceFill" style="width: 0%">
+                        <span id="confidenceText">0%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="resultsSection" style="display: none;">
+            <div class="card">
+                <h2>Analysis Complete ✅</h2>
+                <div id="resultsContent"></div>
+            </div>
+        </div>
+
+        <div class="action-buttons" style="margin-top: 2rem;">
+            <a href="/admin.html" class="btn btn-secondary">← Back to Admin</a>
+            <a href="/nexus.html" class="btn btn-secondary">NEXUS V2 (Non-Streaming)</a>
+        </div>
+    </div>
+
+    <script>
+        let members = [];
+        let eventSource = null;
+        let completedAgents = 0;
+        let totalAgents = 8;
+
+        // Load members
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/v3.5/members');
+                const data = await response.json();
+                members = data.members;
+
+                const member1Select = document.getElementById('member1');
+                const member2Select = document.getElementById('member2');
+
+                member1Select.innerHTML = '<option value="">-- Select Member 1 --</option>';
+                member2Select.innerHTML = '<option value="">-- Select Member 2 --</option>';
+
+                members.forEach(m => {
+                    const option1 = new Option(`${m.name} (${m.org})`, m.member_id);
+                    const option2 = new Option(`${m.name} (${m.org})`, m.member_id);
+                    member1Select.add(option1);
+                    member2Select.add(option2);
+                });
+            } catch (error) {
+                console.error('Failed to load members:', error);
+                alert('Failed to load members');
+            }
+        }
+
+        // Start streaming analysis
+        document.getElementById('analyzeBtn').addEventListener('click', () => {
+            const member1Id = document.getElementById('member1').value;
+            const member2Id = document.getElementById('member2').value;
+
+            if (!member1Id || !member2Id) {
+                alert('Please select both members');
+                return;
+            }
+
+            if (member1Id === member2Id) {
+                alert('Please select different members');
+                return;
+            }
+
+            startStreamingAnalysis(member1Id, member2Id);
+        });
+
+        function startStreamingAnalysis(member1Id, member2Id) {
+            // Reset UI
+            document.getElementById('layerProgress').style.display = 'block';
+            document.getElementById('agentSection').style.display = 'block';
+            document.getElementById('scoreSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('cacheIndicator').style.display = 'none';
+
+            // Reset layers
+            for (let i = 0; i <= 5; i++) {
+                const layer = document.getElementById(`layer${i}`);
+                layer.className = 'layer-card pending';
+                layer.querySelector('.status').textContent = 'Pending...';
+            }
+
+            // Reset score
+            document.getElementById('scoreValue').textContent = '--';
+            document.getElementById('scoreGrade').textContent = 'Analyzing...';
+            document.getElementById('confidenceFill').style.width = '0%';
+            document.getElementById('confidenceText').textContent = '0%';
+
+            // Reset agents
+            document.getElementById('agentGrid').innerHTML = '';
+            completedAgents = 0;
+
+            // Close existing connection
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            // Start SSE stream
+            eventSource = new EventSource(`/api/v3.5/stream-match/${member1Id}/${member2Id}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleStreamEvent(data);
+            };
+
+            eventSource.onerror = (error) => {
+                console.error('SSE error:', error);
+                eventSource.close();
+                alert('Streaming connection error. Check console for details.');
+            };
+        }
+
+        function handleStreamEvent(data) {
+            console.log('Stream event:', data);
+
+            switch (data.type) {
+                case 'layer_start':
+                    updateLayerStatus(data.layer, 'in-progress', 'Processing...');
+                    break;
+
+                case 'layer_complete':
+                    updateLayerStatus(data.layer, 'complete', '✅ Complete');
+                    if (data.layer === 1 && data.data) {
+                        showCacheIndicator(data.data.semanticCacheHit, data.data.similarity, data.data.ageDecay);
+                    }
+                    break;
+
+                case 'agent_complete':
+                    handleAgentComplete(data);
+                    break;
+
+                case 'score_update':
+                    updateScore(data.data, data.confidence);
+                    break;
+
+                case 'final':
+                    handleFinalResult(data.data);
+                    break;
+
+                case 'error':
+                    alert('Error: ' + data.message);
+                    eventSource.close();
+                    break;
+            }
+        }
+
+        function updateLayerStatus(layer, status, text) {
+            const layerCard = document.getElementById(`layer${layer}`);
+            if (layerCard) {
+                layerCard.className = `layer-card ${status}`;
+                layerCard.querySelector('.status').textContent = text;
+            }
+        }
+
+        function showCacheIndicator(hit, similarity, ageDecay) {
+            const indicator = document.getElementById('cacheIndicator');
+            indicator.style.display = 'block';
+
+            if (hit) {
+                indicator.className = 'cache-indicator';
+                indicator.innerHTML = `
+                    <span style="font-size: 1.5rem;">🎯</span>
+                    <div>
+                        <strong>SEMANTIC CACHE HIT!</strong><br>
+                        Similarity: ${(similarity * 100).toFixed(1)}% | Age Decay: ${(ageDecay * 100).toFixed(0)}%
+                    </div>
+                `;
+            } else {
+                indicator.className = 'cache-indicator miss';
+                indicator.innerHTML = `
+                    <span style="font-size: 1.5rem;">🌐</span>
+                    <div><strong>Fresh Analysis</strong> - No cache match found</div>
+                `;
+            }
+        }
+
+        function handleAgentComplete(data) {
+            completedAgents++;
+
+            // Create or update agent card
+            let card = document.querySelector(`[data-agent="${data.agent}"]`);
+            if (!card) {
+                card = document.createElement('div');
+                card.className = 'agent-card';
+                card.setAttribute('data-agent', data.agent);
+                document.getElementById('agentGrid').appendChild(card);
+            }
+
+            card.className = 'agent-card completed';
+            card.innerHTML = `
+                <div class="agent-name">${data.agent.replace(/_/g, ' ')}</div>
+                <div class="agent-score">${data.data.score || 'N/A'}</div>
+                <div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem;">
+                    Confidence: ${data.data.confidence || 0}%
+                </div>
+            `;
+
+            // Update confidence bar based on completion ratio
+            const confidence = Math.round((completedAgents / totalAgents) * 100);
+            document.getElementById('confidenceFill').style.width = `${confidence}%`;
+            document.getElementById('confidenceText').textContent = `${confidence}%`;
+        }
+
+        function updateScore(scoringData, confidence) {
+            document.getElementById('scoreValue').textContent = scoringData.final_score;
+            document.getElementById('scoreGrade').textContent = scoringData.grade;
+
+            const confPercent = Math.round(confidence * 100);
+            document.getElementById('confidenceFill').style.width = `${confPercent}%`;
+            document.getElementById('confidenceText').textContent = `${confPercent}% Confidence`;
+        }
+
+        function handleFinalResult(result) {
+            eventSource.close();
+
+            document.getElementById('scoreValue').textContent = result.score;
+            document.getElementById('scoreGrade').textContent = result.grade;
+            document.getElementById('confidenceFill').style.width = '100%';
+            document.getElementById('confidenceText').textContent = '100% Complete';
+
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsContent').innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <strong>Final Score:</strong><br>
+                        <span style="font-size: 2rem; color: #3b82f6;">${result.score}/100</span>
+                    </div>
+                    <div>
+                        <strong>Grade:</strong><br>
+                        <span style="font-size: 2rem; color: #10b981;">${result.grade}</span>
+                    </div>
+                    <div>
+                        <strong>Processing Time:</strong><br>
+                        <span style="font-size: 1.5rem;">${result.processing_time}s</span>
+                    </div>
+                    <div>
+                        <strong>Cache Hit:</strong><br>
+                        <span style="font-size: 1.5rem;">${result.semantic_cache_hit ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div>
+                        <strong>Agents Used:</strong><br>
+                        <span style="font-size: 1.5rem;">${result.total_agents}</span>
+                    </div>
+                    <div>
+                        <strong>Pipeline:</strong><br>
+                        <span style="font-size: 1.2rem;">${result.pipeline_version}</span>
+                    </div>
+                </div>
+                <div style="margin-top: 2rem; padding: 1rem; background: #f9fafb; border-radius: 8px;">
+                    <strong>Scoring Breakdown:</strong>
+                    <ul style="margin-top: 0.5rem;">
+                        <li>Base Score: ${result.scoring.base_score}</li>
+                        <li>Uniqueness Boost: +${result.scoring.uniqueness_boost}%</li>
+                        <li>Consensus Weight: ${result.scoring.consensus_weight}%</li>
+                        <li>Disagreement Penalty: ${result.scoring.penalty}%</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Load members on page load
+        loadMembers();
+    </script>
+</body>
+</html>

@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -c:*)"
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n🚀 Major AI & UI Enhancement: 9 Substantial Improvements\n\nAI/PROMPT ENGINEERING ENHANCEMENTS:\n1. ✨ Adaptive AI Persona System - 4 different advisor personalities auto-selected based on match type\n2. 🔍 Real-Time Web Search Integration (Stage 1.5) - Live company/industry research before matching\n3. 📊 Confidence Scoring System - Quantifies reliability of AI insights (0-100% with High/Medium/Moderate ratings)\n4. 💬 Communication Style Analysis - Analyzes member personality for better semantic matching\n5. 🎯 Enhanced Match Metadata - Stores confidence scores, AI persona used, research timestamps\n\nUI/VISUAL TRANSFORMATIONS:\n6. 🌈 Animated Gradient Background - Living 6-color gradient with 20s animation loop\n7. ✨ Floating Particles Overlay - Subtle radial gradients that float for visual depth\n8. 💎 Glassmorphism Design System - Frosted glass cards with backdrop-blur, glowing borders, smooth animations\n9. 🎭 Enhanced Match Cards - Radial hover effects, 3D lift animations, confidence badges, AI persona display\n\nTECHNICAL IMPROVEMENTS:\n- Multi-stage prompt chaining enhanced to 5.5 stages (added web research)\n- Temperature control per stage (0.9 creativity, 0.3 fact-checking)\n- JSON structured outputs with validation\n- Graceful fallback handling\n- Communication style embeddings for better matching\n\nVISUAL IMPACT:\nBefore: Basic blue gradient, simple white cards\nAfter: Living animated gradient, frosted glass, hover animations, color-coded confidence indicators, professional iOS-style design\n\nStats: 9 enhancements, ~500+ lines server.js, 700+ lines modern CSS, 100% backward compatible\n\n🤖 Generated with Claude Code (https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
