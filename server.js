@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const db = require('./db');
 const nexusV2 = require('./nexus-v2');
 const nexusV35 = require('./nexus-v3.5');
+const nexusProduction = require('./nexus-production');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1060,38 +1061,62 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       console.log(`   ${i + 1}. ${s.name} (${s.org}): ${s.score}/100 (${s.summary?.grade || '?'}) - ${s.complementaryValueResearch?.creative_collaboration_ideas?.length || 0} creative ideas`);
     });
 
-    // Generate rationales for each match (research already done above)
-    console.log(`🤖 Generating AI intros (Stages 1-3) for ${top3.length} matches...`);
+    // Generate NEXUS Production matches for each top 3 (using V3.5+ engine with V2 output)
+    console.log(`🚀 Generating NEXUS Production matches for ${top3.length} top 3...`);
     for (let i = 0; i < top3.length; i++) {
       const match = top3[i];
-      console.log(`   [${i + 1}/${top3.length}] Generating intro for ${member.name} → ${match.name}...`);
+      console.log(`   [${i + 1}/${top3.length}] NEXUS Production: ${member.name} ↔ ${match.name}...`);
 
       try {
-        // Stage 0 already complete (done during research phase above)
-        const complementaryValueResearch = match.complementaryValueResearch;
-
-        // Pass research to 3-stage synthesis (Stages 1-3)
-        const rationale = await generateMatchRationale(member, match, complementaryValueResearch, true); // true = use GPT-4
-
-        // Ensure intro_basis is a string (handle if AI returns object)
-        let introBasisString = rationale.intro_basis;
-        if (typeof introBasisString === 'object') {
-          console.log('   ⚠️  intro_basis is an object, converting to string');
-          introBasisString = JSON.stringify(introBasisString);
-        }
+        // ====================================================================
+        // USE NEXUS PRODUCTION ENGINE (V3.5+ Speed + V2 Rich Output)
+        // ====================================================================
+        const nexusResult = await nexusProduction.generateProductionMatch(member, match);
 
         const introId = generateId('intro');
 
-        // Store both concise breakdown and full breakdown for complete transparency
+        // Create intro_basis from synthesis narrative
+        const introBasisString = nexusResult.synthesis?.strategic_narrative ||
+                                 nexusResult.synthesis?.confidence_weighted_recommendation ||
+                                 'High-value strategic connection identified';
+
+        // Store COMPLETE NEXUS analysis for rich display
         const scoreData = {
-          score: match.score,
-          breakdown: match.breakdown, // Concise for display
-          fullBreakdown: match.fullBreakdown, // Complete objective matrix
-          summary: match.summary, // Grade and percentage
-          complementaryValueResearch, // Store research findings for display
-          confidence_score: rationale.confidence_score || null,  // ENHANCEMENT: Add confidence
-          ai_persona: rationale.ai_persona_used || 'Strategic Growth Advisor',  // ENHANCEMENT: Track AI persona
-          research_timestamp: new Date().toISOString()
+          score: nexusResult.score,
+          breakdown: match.breakdown, // Keep original math breakdown for compatibility
+          fullBreakdown: match.fullBreakdown,
+          summary: match.summary,
+          // ADD ALL NEXUS V2-FORMAT DATA
+          intelligence: nexusResult.intelligence,
+          agent_outputs: nexusResult.agent_outputs,
+          synthesis: nexusResult.synthesis,
+          quality_control: nexusResult.quality_control,
+          scoring: nexusResult.scoring,
+          // Metadata
+          confidence_score: nexusResult.scoring?.confidence?.overall || null,
+          ai_persona: 'NEXUS Production (Multi-Agent)',
+          research_timestamp: nexusResult.generated_at,
+          pipeline_version: nexusResult.pipeline_version,
+          semantic_cache_hit: nexusResult.semantic_cache_hit,
+          processing_time: nexusResult.processing_time
+        };
+
+        // Create creative_angle from top opportunities
+        const creativeAngle = nexusResult.synthesis?.top_5_opportunities?.slice(0, 3).join(' • ') ||
+                             'Strategic collaboration opportunity';
+
+        // Create rationale_ops from synthesis + agent outputs
+        const rationaleOps = {
+          consensus_points: nexusResult.synthesis?.consensus_points || [],
+          unique_insights: nexusResult.synthesis?.unique_insights || [],
+          strategic_opportunities: nexusResult.synthesis?.top_5_opportunities || [],
+          agent_scores: {
+            business_synergy: nexusResult.agent_outputs?.business_synergy?.synergy_score || 0,
+            creative_collaboration: nexusResult.agent_outputs?.creative_collaboration?.creativity_score || 0,
+            risk_compatibility: nexusResult.agent_outputs?.risk_compatibility?.compatibility_score || 0,
+            strategic_growth: nexusResult.agent_outputs?.strategic_growth?.strategic_score || 0,
+            tactical_connection: nexusResult.agent_outputs?.tactical_connection?.tactical_score || 0
+          }
         };
 
         await db.run(`
@@ -1099,11 +1124,11 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'top3', match.score, JSON.stringify(scoreData), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'top3', nexusResult.score, JSON.stringify(scoreData), JSON.stringify(rationaleOps), creativeAngle, introBasisString]);
 
-        console.log(`   ✅ Generated intro for ${match.name}`);
+        console.log(`   ✅ NEXUS Production complete: ${match.name} (${nexusResult.score}/100, ${nexusResult.grade}) [${nexusResult.processing_time}s]`);
       } catch (error) {
-        console.error(`   ❌ Failed to generate intro for ${match.name}:`, error.message);
+        console.error(`   ❌ NEXUS Production failed for ${match.name}:`, error.message);
         // Continue with other matches even if one fails
       }
     }
@@ -1219,41 +1244,62 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     console.log(`📊 Score Distribution: 75+:${scoreRanges.excellent}, 60-74:${scoreRanges.strong}, 50-59:${scoreRanges.good}, 40-49:${scoreRanges.moderate}, 30-39:${scoreRanges.baseline}, 1-29:${scoreRanges.low}, 0:${scoreRanges.zero}`);
     console.log(`📊 Brainstorm: ${scored.length} total candidates, ${filtered.length} valid matches (all included - no filtering)`);
 
-    // Generate AI rationales for brainstorm matches (using GPT-4o with 5-stage research including fact-checking)
-    console.log(`🤖 Generating AI intros with 5-stage research (with fact-checking) for ${brainstorm.length} brainstorm matches (may take 2-5 minutes)...`);
+    // Generate NEXUS Production matches for all brainstorm (using V3.5+ engine with V2 output)
+    console.log(`🚀 Generating NEXUS Production for ${brainstorm.length} brainstorm matches (fast with caching!)...`);
     for (let i = 0; i < brainstorm.length; i++) {
       const match = brainstorm[i];
-      console.log(`   [${i + 1}/${brainstorm.length}] Generating intro for ${member.name} → ${match.name}...`);
+      console.log(`   [${i + 1}/${brainstorm.length}] NEXUS Production: ${member.name} ↔ ${match.name}...`);
 
       try {
-        // STAGE 0: Deep complementary value research (happens BEFORE synthesis)
-        const complementaryValueResearch = await researchComplementaryValue(member, match);
-        console.log(`   ✅ Stage 0 complete: Complementary value research for ${match.name}`);
-
-        // Pass complementary value research to 3-stage synthesis (Stages 1-3)
-        const rationale = await generateMatchRationale(member, match, complementaryValueResearch, true); // true = use GPT-4o
-        console.log(`   ✅ Stages 1-3 complete: Strategic synthesis for ${match.name}`);
-
-        // Ensure intro_basis is a string (handle if AI returns object)
-        let introBasisString = rationale.intro_basis;
-        if (typeof introBasisString === 'object') {
-          console.log('   ⚠️  intro_basis is an object, converting to string');
-          introBasisString = JSON.stringify(introBasisString);
-        }
+        // ====================================================================
+        // USE NEXUS PRODUCTION ENGINE (V3.5+ Speed + V2 Rich Output)
+        // ====================================================================
+        const nexusResult = await nexusProduction.generateProductionMatch(member, match);
 
         const introId = generateId('intro');
 
-        // Store both concise breakdown and full breakdown for complete transparency
-        // PLUS the complementary value research findings
+        // Create intro_basis from synthesis narrative
+        const introBasisString = nexusResult.synthesis?.strategic_narrative ||
+                                 nexusResult.synthesis?.confidence_weighted_recommendation ||
+                                 'High-value strategic connection identified';
+
+        // Store COMPLETE NEXUS analysis for rich display
         const scoreData = {
-          score: match.score,
-          breakdown: match.breakdown, // Concise for display
-          fullBreakdown: match.fullBreakdown, // Complete objective matrix
-          summary: match.summary, // Grade and percentage
-          complementaryValueResearch, // Store research findings for display
-          confidence_score: rationale.confidence_score || null,  // ENHANCEMENT: Add confidence
-          ai_persona: rationale.ai_persona_used || 'Strategic Growth Advisor',  // ENHANCEMENT: Track AI persona
-          research_timestamp: new Date().toISOString()
+          score: nexusResult.score,
+          breakdown: match.breakdown, // Keep original math breakdown for compatibility
+          fullBreakdown: match.fullBreakdown,
+          summary: match.summary,
+          // ADD ALL NEXUS V2-FORMAT DATA
+          intelligence: nexusResult.intelligence,
+          agent_outputs: nexusResult.agent_outputs,
+          synthesis: nexusResult.synthesis,
+          quality_control: nexusResult.quality_control,
+          scoring: nexusResult.scoring,
+          // Metadata
+          confidence_score: nexusResult.scoring?.confidence?.overall || null,
+          ai_persona: 'NEXUS Production (Multi-Agent)',
+          research_timestamp: nexusResult.generated_at,
+          pipeline_version: nexusResult.pipeline_version,
+          semantic_cache_hit: nexusResult.semantic_cache_hit,
+          processing_time: nexusResult.processing_time
+        };
+
+        // Create creative_angle from top opportunities
+        const creativeAngle = nexusResult.synthesis?.top_5_opportunities?.slice(0, 3).join(' • ') ||
+                             'Strategic collaboration opportunity';
+
+        // Create rationale_ops from synthesis + agent outputs
+        const rationaleOps = {
+          consensus_points: nexusResult.synthesis?.consensus_points || [],
+          unique_insights: nexusResult.synthesis?.unique_insights || [],
+          strategic_opportunities: nexusResult.synthesis?.top_5_opportunities || [],
+          agent_scores: {
+            business_synergy: nexusResult.agent_outputs?.business_synergy?.synergy_score || 0,
+            creative_collaboration: nexusResult.agent_outputs?.creative_collaboration?.creativity_score || 0,
+            risk_compatibility: nexusResult.agent_outputs?.risk_compatibility?.compatibility_score || 0,
+            strategic_growth: nexusResult.agent_outputs?.strategic_growth?.strategic_score || 0,
+            tactical_connection: nexusResult.agent_outputs?.tactical_connection?.tactical_score || 0
+          }
         };
 
         await db.run(`
@@ -1261,11 +1307,11 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'brainstorm', match.score, JSON.stringify(scoreData), rationale.rationale_ops, rationale.creative_angle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'brainstorm', nexusResult.score, JSON.stringify(scoreData), JSON.stringify(rationaleOps), creativeAngle, introBasisString]);
 
-        console.log(`   ✅ Generated intro for ${match.name}`);
+        console.log(`   ✅ NEXUS Production complete: ${match.name} (${nexusResult.score}/100) [${nexusResult.processing_time}s, cache: ${nexusResult.semantic_cache_hit ? 'HIT' : 'MISS'}]`);
       } catch (error) {
-        console.error(`   ❌ Failed to generate intro for ${match.name}:`, error.message);
+        console.error(`   ❌ NEXUS Production failed for ${match.name}:`, error.message);
         // Continue with other matches even if one fails
       }
     }
