@@ -975,8 +975,12 @@
                 }
             } catch (error) {
                 hideProgressOverlay();
-                alert('❌ Failed to generate matches: ' + error.message);
-                console.error(error);
+                console.error('Full error:', error);
+                let errorMsg = '❌ Failed to generate matches: ' + error.message;
+                if (error.message.includes('JSON')) {
+                    errorMsg += '\n\nThis might be a server error. Check the Render logs for details.';
+                }
+                alert(errorMsg);
             } finally {
                 btn.disabled = false;
             }
@@ -1022,8 +1026,12 @@
                 }
             } catch (error) {
                 hideProgressOverlay();
-                alert('❌ Failed to generate brainstorm: ' + error.message);
-                console.error(error);
+                console.error('Full error:', error);
+                let errorMsg = '❌ Failed to generate brainstorm: ' + error.message;
+                if (error.message.includes('JSON')) {
+                    errorMsg += '\n\nThis might be a server error. Check the Render logs for details.';
+                }
+                alert(errorMsg);
             } finally {
                 btn.disabled = false;
             }

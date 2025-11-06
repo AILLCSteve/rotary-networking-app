@@ -1128,7 +1128,12 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     res.json({ success: true, count: top3.length });
   } catch (error) {
     console.error('Generate top3 error:', error);
-    res.status(500).json({ error: 'Failed to generate matches' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Failed to generate matches',
+      message: error.message,
+      details: error.stack
+    });
   }
 });
 
@@ -1301,7 +1306,12 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
     res.json({ success: true, count: brainstorm.length });
   } catch (error) {
     console.error('Generate brainstorm error:', error);
-    res.status(500).json({ error: 'Failed to generate brainstorm matches' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: 'Failed to generate brainstorm matches',
+      message: error.message,
+      details: error.stack
+    });
   }
 });
 
