@@ -1080,51 +1080,41 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
                                  nexusResult.synthesis?.confidence_weighted_recommendation ||
                                  'High-value strategic connection identified';
 
-        // Store COMPLETE NEXUS analysis for rich display
+        // Store COMPLETE NEXUS V2 analysis (direct passthrough)
         const scoreData = {
+          // Core V2 structure
           score: nexusResult.score,
-          breakdown: match.breakdown, // Keep original math breakdown for compatibility
-          fullBreakdown: match.fullBreakdown,
-          summary: match.summary,
-          // ADD ALL NEXUS V2-FORMAT DATA
+          grade: nexusResult.grade,
+          processing_time: nexusResult.processing_time,
+
+          // V2 Output Fields
           intelligence: nexusResult.intelligence,
           agent_outputs: nexusResult.agent_outputs,
           synthesis: nexusResult.synthesis,
           quality_control: nexusResult.quality_control,
           scoring: nexusResult.scoring,
+
           // Metadata
-          confidence_score: nexusResult.scoring?.confidence?.overall || null,
-          ai_persona: 'NEXUS Production (Multi-Agent)',
-          research_timestamp: nexusResult.generated_at,
           pipeline_version: nexusResult.pipeline_version,
           semantic_cache_hit: nexusResult.semantic_cache_hit,
-          processing_time: nexusResult.processing_time
+          generated_at: nexusResult.generated_at
         };
 
-        // Create creative_angle from top opportunities
-        const creativeAngle = nexusResult.synthesis?.top_5_opportunities?.slice(0, 3).join(' • ') ||
+        // Create simple text summaries for legacy fields
+        const creativeAngle = nexusResult.synthesis?.strategic_narrative ||
+                             nexusResult.synthesis?.top_5_opportunities?.[0] ||
                              'Strategic collaboration opportunity';
 
-        // Create rationale_ops from synthesis + agent outputs
-        const rationaleOps = {
-          consensus_points: nexusResult.synthesis?.consensus_points || [],
-          unique_insights: nexusResult.synthesis?.unique_insights || [],
-          strategic_opportunities: nexusResult.synthesis?.top_5_opportunities || [],
-          agent_scores: {
-            business_synergy: nexusResult.agent_outputs?.business_synergy?.synergy_score || 0,
-            creative_collaboration: nexusResult.agent_outputs?.creative_collaboration?.creativity_score || 0,
-            risk_compatibility: nexusResult.agent_outputs?.risk_compatibility?.compatibility_score || 0,
-            strategic_growth: nexusResult.agent_outputs?.strategic_growth?.strategic_score || 0,
-            tactical_connection: nexusResult.agent_outputs?.tactical_connection?.tactical_score || 0
-          }
-        };
+        const rationaleOps = nexusResult.synthesis?.strategic_narrative ||
+                            (nexusResult.synthesis?.consensus_points || []).join('. ') ||
+                            'Strategic match identified by NEXUS Production';
 
         await db.run(`
           INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'top3', nexusResult.score, JSON.stringify(scoreData), JSON.stringify(rationaleOps), creativeAngle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'top3', nexusResult.score, JSON.stringify(scoreData), rationaleOps, creativeAngle, introBasisString]);
 
         console.log(`   ✅ NEXUS Production complete: ${match.name} (${nexusResult.score}/100, ${nexusResult.grade}) [${nexusResult.processing_time}s]`);
       } catch (error) {
@@ -1263,44 +1253,34 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
                                  nexusResult.synthesis?.confidence_weighted_recommendation ||
                                  'High-value strategic connection identified';
 
-        // Store COMPLETE NEXUS analysis for rich display
+        // Store COMPLETE NEXUS V2 analysis (direct passthrough)
         const scoreData = {
+          // Core V2 structure
           score: nexusResult.score,
-          breakdown: match.breakdown, // Keep original math breakdown for compatibility
-          fullBreakdown: match.fullBreakdown,
-          summary: match.summary,
-          // ADD ALL NEXUS V2-FORMAT DATA
+          grade: nexusResult.grade,
+          processing_time: nexusResult.processing_time,
+
+          // V2 Output Fields
           intelligence: nexusResult.intelligence,
           agent_outputs: nexusResult.agent_outputs,
           synthesis: nexusResult.synthesis,
           quality_control: nexusResult.quality_control,
           scoring: nexusResult.scoring,
+
           // Metadata
-          confidence_score: nexusResult.scoring?.confidence?.overall || null,
-          ai_persona: 'NEXUS Production (Multi-Agent)',
-          research_timestamp: nexusResult.generated_at,
           pipeline_version: nexusResult.pipeline_version,
           semantic_cache_hit: nexusResult.semantic_cache_hit,
-          processing_time: nexusResult.processing_time
+          generated_at: nexusResult.generated_at
         };
 
-        // Create creative_angle from top opportunities
-        const creativeAngle = nexusResult.synthesis?.top_5_opportunities?.slice(0, 3).join(' • ') ||
+        // Create simple text summaries for legacy fields
+        const creativeAngle = nexusResult.synthesis?.strategic_narrative ||
+                             nexusResult.synthesis?.top_5_opportunities?.[0] ||
                              'Strategic collaboration opportunity';
 
-        // Create rationale_ops from synthesis + agent outputs
-        const rationaleOps = {
-          consensus_points: nexusResult.synthesis?.consensus_points || [],
-          unique_insights: nexusResult.synthesis?.unique_insights || [],
-          strategic_opportunities: nexusResult.synthesis?.top_5_opportunities || [],
-          agent_scores: {
-            business_synergy: nexusResult.agent_outputs?.business_synergy?.synergy_score || 0,
-            creative_collaboration: nexusResult.agent_outputs?.creative_collaboration?.creativity_score || 0,
-            risk_compatibility: nexusResult.agent_outputs?.risk_compatibility?.compatibility_score || 0,
-            strategic_growth: nexusResult.agent_outputs?.strategic_growth?.strategic_score || 0,
-            tactical_connection: nexusResult.agent_outputs?.tactical_connection?.tactical_score || 0
-          }
-        };
+        const rationaleOps = nexusResult.synthesis?.strategic_narrative ||
+                            (nexusResult.synthesis?.consensus_points || []).join('. ') ||
+                            'Strategic match identified by NEXUS Production';
 
         await db.run(`
           INSERT INTO intros (intro_id, for_member_id, to_member_id, tier, score, score_breakdown, rationale_ops, creative_angle, intro_basis)
