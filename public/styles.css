@@ -1133,7 +1133,7 @@ tr:hover {
   font-style: italic;
 }
 
-/* ========== FROSTED TEXT CONTAINERS FOR READABILITY ========== */
+/* ========== SUBTLE TEXT SHADOWS FOR READABILITY ========== */
 .header h1,
 .header .subtitle,
 .header p,
@@ -1141,41 +1141,19 @@ tr:hover {
 .section .info,
 .card h2,
 .card h3,
-.form-group label {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  padding: 0.8rem 1.2rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  display: inline-block;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.form-group label,
+p, li, span, div {
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 0 20px rgba(0, 0, 0, 0.15);
 }
 
-.header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
-}
-
-.header .subtitle,
-.header p {
-  font-size: 1.1rem;
-  margin-top: 0.5rem;
-}
-
-.section h2 {
-  font-size: 1.8rem;
-  margin-bottom: 1.5rem;
-}
-
-.section .info {
-  margin-bottom: 1.5rem;
-  line-height: 1.6;
-}
-
+/* Very subtle frost ONLY for major cards, not text containers */
 .card {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(15px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* ========== RESPONSIVE ========== */
