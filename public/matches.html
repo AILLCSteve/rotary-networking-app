@@ -5,6 +5,180 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Networking Matches</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* V2 Output Display Styles */
+        .match-card {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .match-card.expanded {
+            grid-column: 1 / -1;
+            max-width: 100%;
+        }
+
+        .match-header-enhanced {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .expand-toggle {
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: #667eea;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+        }
+
+        .expand-toggle:hover {
+            background: rgba(102, 126, 234, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .v2-analysis {
+            display: none;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .v2-analysis.visible {
+            display: block;
+            animation: slideDown 0.4s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .analysis-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .analysis-section h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .agent-output {
+            background: rgba(102, 126, 234, 0.08);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid #667eea;
+        }
+
+        .agent-output h4 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .agent-score {
+            display: inline-block;
+            background: rgba(0, 200, 100, 0.15);
+            color: #00c864;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+        }
+
+        .opportunity-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .opportunity-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid #00c864;
+        }
+
+        .quality-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric-box {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 0.25rem;
+        }
+
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .viz-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .viz-container h4 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .insight-tag {
+            display: inline-block;
+            background: rgba(102, 126, 234, 0.15);
+            color: #667eea;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -15,7 +189,7 @@
 
         <div class="section">
             <h2>🌟 Your Top 3 Matches</h2>
-            <p class="info">These are your highest-scored potential connections based on complementary needs and assets</p>
+            <p class="info">These are your highest-scored potential connections with deep AI analysis. Click "View Full Analysis" to see all insights!</p>
 
             <div class="action-bar">
                 <button class="btn btn-primary" id="generateTop3">Generate My Top 3 Matches</button>
@@ -65,37 +239,37 @@
         // Get member ID from URL
         const urlParams = new URLSearchParams(window.location.search);
         const memberId = urlParams.get('id');
-        
+
         if (!memberId) {
             alert('No member ID provided. Please register first.');
             window.location.href = '/';
         }
-        
+
         let currentIntroId = null;
-        
+
         // Load member data and matches
         async function loadDashboard() {
             try {
                 const response = await fetch(`/api/member/${memberId}`);
                 const data = await response.json();
-                
+
                 // Display member info
                 document.getElementById('memberInfo').innerHTML = `
                     <strong>${data.member.name}</strong> | ${data.member.org} | ${data.member.role}
                 `;
-                
-                // Display top 3 matches
-                displayMatches(data.top3, 'top3Matches');
-                
-                // Display brainstorm matches
-                displayMatches(data.brainstorm, 'brainstormMatches');
-                
+
+                // Display top 3 matches (with full V2 output)
+                displayMatches(data.top3, 'top3Matches', true);
+
+                // Display brainstorm matches (with full V2 output)
+                displayMatches(data.brainstorm, 'brainstormMatches', false);
+
             } catch (error) {
                 console.error('Failed to load dashboard:', error);
             }
         }
-        
-        function displayMatches(matches, containerId) {
+
+        function displayMatches(matches, containerId, isTop3) {
             const container = document.getElementById(containerId);
 
             if (!matches || matches.length === 0) {
@@ -103,102 +277,72 @@
                 return;
             }
 
-            container.innerHTML = matches.map(match => {
+            container.innerHTML = matches.map((match, matchIndex) => {
                 // Parse score breakdown if available
-                let scoreBreakdownHTML = '';
+                let scoreData = null;
+                let hasV2Data = false;
+
                 if (match.score_breakdown) {
                     try {
-                        const scoreData = typeof match.score_breakdown === 'string'
+                        scoreData = typeof match.score_breakdown === 'string'
                             ? JSON.parse(match.score_breakdown)
                             : match.score_breakdown;
 
-                        // scoreData contains: { breakdown, fullBreakdown, summary }
-                        const breakdown = scoreData.breakdown || scoreData; // fallback to old format
-                        const summary = scoreData.summary;
-
-                        // ENHANCEMENT: Display confidence score and AI persona
-                        const confidenceScore = scoreData.confidence_score;
-                        const aiPersona = scoreData.ai_persona;
-                        const confidenceBadge = confidenceScore ? `
-                            <div style="margin-top: 0.8rem; padding: 0.6rem 1rem; background: rgba(${confidenceScore.overall >= 80 ? '0,200,100' : confidenceScore.overall >= 60 ? '100,150,255' : '255,200,0'}, 0.15); border-radius: 10px; border: 1px solid rgba(${confidenceScore.overall >= 80 ? '0,200,100' : confidenceScore.overall >= 60 ? '100,150,255' : '255,200,0'}, 0.3);">
-                                <div style="display: flex; align-items: center; gap: 0.5rem; color: white; font-size: 0.85rem;">
-                                    <span style="font-weight: 700;">${confidenceScore.overall >= 80 ? '🎯' : confidenceScore.overall >= 60 ? '✓' : '💡'} ${confidenceScore.rating} Confidence</span>
-                                    <span style="opacity: 0.8;">•</span>
-                                    <span style="opacity: 0.8;">${confidenceScore.overall}% Research Quality</span>
-                                </div>
-                                ${aiPersona ? `<div style="margin-top: 0.4rem; font-size: 0.8rem; opacity: 0.7; color: white;">🤖 Analyzed by: ${aiPersona}</div>` : ''}
-                            </div>
-                        ` : '';
-
-                        scoreBreakdownHTML = `
-                            <div class="score-breakdown">
-                                <div class="score-header">
-                                    <strong>Match Score: ${Math.round(match.score)}/100</strong>
-                                    ${summary ? `<span class="grade-badge grade-${summary.grade.replace('+', 'plus')}">${summary.grade}</span>` : ''}
-                                </div>
-                                ${confidenceBadge}
-                                <div class="breakdown-details">
-                                    ${breakdown.map((item, idx) => {
-                                        const percentage = item.maxPoints > 0 ? (item.points / item.maxPoints) * 100 : 0;
-
-                                        // Check if this is the Complementary Value category with creative ideas
-                                        const isComplementaryValue = item.factor === 'Complementary Value Exchange';
-                                        const hasCreativeIdeas = isComplementaryValue && scoreData.complementaryValueResearch?.creative_collaboration_ideas;
-                                        const creativeIdeas = hasCreativeIdeas ? scoreData.complementaryValueResearch.creative_collaboration_ideas : [];
-                                        const ideasCount = Array.isArray(creativeIdeas) ? creativeIdeas.length : 0;
-
-                                        return `
-                                        <div class="breakdown-item">
-                                            <div class="breakdown-header">
-                                                <span class="factor-name">${item.factor}</span>
-                                                <span class="factor-score">${item.points}/${item.maxPoints} pts</span>
-                                            </div>
-                                            <div class="progress-bar">
-                                                <div class="progress-fill" style="width: ${percentage}%"></div>
-                                            </div>
-                                            ${item.description ? `<div class="factor-description">${item.description}</div>` : ''}
-                                            ${hasCreativeIdeas && ideasCount > 0 ? `
-                                                <button class="btn-toggle-ideas" onclick="toggleCreativeIdeas(event, ${idx})">
-                                                    💡 View ${ideasCount} Creative Collaboration Idea${ideasCount > 1 ? 's' : ''} →
-                                                </button>
-                                                <div class="creative-ideas-list" id="ideas-${idx}" style="display: none;">
-                                                    ${creativeIdeas.map((idea, i) => {
-                                                        // Clean up the idea text (remove dictionary keys like "1:", "2:", etc)
-                                                        const cleanIdea = typeof idea === 'string'
-                                                            ? idea.replace(/^["']?\d+["']?\s*:\s*/, '').replace(/^["']|["']$/g, '').trim()
-                                                            : JSON.stringify(idea);
-                                                        return `<div class="idea-item">
-                                                            <span class="idea-number">${i + 1}</span>
-                                                            <span class="idea-text">${cleanIdea}</span>
-                                                        </div>`;
-                                                    }).join('')}
-                                                </div>
-                                            ` : ''}
-                                        </div>
-                                        `;
-                                    }).join('')}
-                                </div>
-                            </div>
-                        `;
+                        // Check if we have NEXUS Production V2 data
+                        hasV2Data = scoreData.intelligence || scoreData.agent_outputs || scoreData.synthesis;
                     } catch (e) {
                         console.error('Error parsing score breakdown:', e);
-                        scoreBreakdownHTML = `<p class="match-score">Match Score: ${Math.round(match.score)}/100</p>`;
                     }
-                } else {
-                    scoreBreakdownHTML = match.score ? `<p class="match-score">Match Score: ${Math.round(match.score)}/100</p>` : '';
                 }
 
-                return `
-                <div class="match-card ${match.status === 'acknowledged' ? 'acknowledged' : ''}" data-intro-id="${match.intro_id}">
-                    <div class="match-header">
-                        <h4>${match.name}</h4>
-                        <span class="match-org">${match.org}</span>
-                        ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
+                // Build basic match card HTML
+                let cardHTML = `
+                <div class="match-card ${match.status === 'acknowledged' ? 'acknowledged' : ''}" data-intro-id="${match.intro_id}" id="match-${matchIndex}">
+                    <div class="match-header-enhanced" onclick="toggleAnalysis(${matchIndex})">
+                        <div>
+                            <h4>${match.name}</h4>
+                            <span class="match-org">${match.org}</span>
+                            ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
+                        </div>
+                        ${hasV2Data ? `<div class="expand-toggle" id="toggle-${matchIndex}">📊 View Full Analysis →</div>` : ''}
                     </div>
                     <div class="match-details">
                         <p class="match-role">${match.role} • ${match.city || 'Location not specified'}</p>
-                        ${scoreBreakdownHTML}
-                    </div>
+                `;
+
+                // Add score breakdown
+                if (scoreData) {
+                    const breakdown = scoreData.breakdown || scoreData;
+                    const summary = scoreData.summary;
+                    const confidenceScore = scoreData.confidence_score;
+                    const aiPersona = scoreData.ai_persona;
+
+                    const confidenceBadge = confidenceScore ? `
+                        <div style="margin-top: 0.8rem; padding: 0.6rem 1rem; background: rgba(${confidenceScore.overall >= 80 ? '0,200,100' : confidenceScore.overall >= 60 ? '100,150,255' : '255,200,0'}, 0.15); border-radius: 10px; border: 1px solid rgba(${confidenceScore.overall >= 80 ? '0,200,100' : confidenceScore.overall >= 60 ? '100,150,255' : '255,200,0'}, 0.3);">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: white; font-size: 0.85rem;">
+                                <span style="font-weight: 700;">${confidenceScore.overall >= 80 ? '🎯' : confidenceScore.overall >= 60 ? '✓' : '💡'} ${confidenceScore.rating} Confidence</span>
+                                <span style="opacity: 0.8;">•</span>
+                                <span style="opacity: 0.8;">${confidenceScore.overall}% Research Quality</span>
+                            </div>
+                            ${aiPersona ? `<div style="margin-top: 0.4rem; font-size: 0.8rem; opacity: 0.7; color: white;">🤖 ${aiPersona}</div>` : ''}
+                        </div>
+                    ` : '';
+
+                    cardHTML += `
+                        <div class="score-breakdown">
+                            <div class="score-header">
+                                <strong>Match Score: ${Math.round(match.score)}/100</strong>
+                                ${summary ? `<span class="grade-badge grade-${summary.grade.replace('+', 'plus')}">${summary.grade}</span>` : ''}
+                            </div>
+                            ${confidenceBadge}
+                        </div>
+                    `;
+                }
+
+                cardHTML += `</div>`; // Close match-details
+
+                // Add basic rationale
+                cardHTML += `
                     <div class="match-rationale">
                         ${match.rationale_ops ? `
                             <div class="rationale-item">
@@ -213,62 +357,473 @@
                             </div>
                         ` : ''}
                     </div>
+                `;
+
+                // ADD V2 ANALYSIS SECTION (collapsible)
+                if (hasV2Data) {
+                    cardHTML += buildV2AnalysisSection(scoreData, matchIndex);
+                }
+
+                // Add action button
+                cardHTML += `
                     <button class="btn btn-small intro-btn" data-intro-id="${match.intro_id}">
                         View Conversation Starters →
                     </button>
                 </div>
-            `;
+                `;
+
+                return cardHTML;
             }).join('');
 
             // Add event listeners to intro buttons
             document.querySelectorAll('.intro-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const introId = this.dataset.introId;
-                    // Find the match data from the matches array
                     const match = matches.find(m => m.intro_id === introId);
-                    console.log('Match found:', match);
-                    console.log('intro_basis type:', typeof match?.intro_basis);
-                    console.log('intro_basis value:', match?.intro_basis);
                     const introBasis = match ? (match.intro_basis || 'Start a conversation about how you can help each other.') : 'No introduction available.';
                     showIntro(introId, introBasis);
                 });
             });
         }
 
-        function escapeForAttribute(text) {
-            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        // BUILD V2 ANALYSIS SECTION
+        function buildV2AnalysisSection(scoreData, matchIndex) {
+            let html = '<div class="v2-analysis" id="analysis-' + matchIndex + '">';
+
+            // INTELLIGENCE SECTION
+            if (scoreData.intelligence) {
+                const intel = scoreData.intelligence;
+                html += `
+                    <div class="analysis-section">
+                        <h3>🔍 Intelligence Gathering</h3>
+                `;
+
+                if (intel.industry_research) {
+                    html += `
+                        <div style="margin-bottom: 1rem;">
+                            <h4 style="color: #667eea; font-size: 0.95rem; margin-bottom: 0.5rem;">Industry Context</h4>
+                            <p style="line-height: 1.6;">${intel.industry_research.summary || JSON.stringify(intel.industry_research)}</p>
+                        </div>
+                    `;
+                }
+
+                if (intel.company_research) {
+                    html += `
+                        <div>
+                            <h4 style="color: #667eea; font-size: 0.95rem; margin-bottom: 0.5rem;">Company/Individual Research</h4>
+                            <p style="line-height: 1.6;">${intel.company_research.summary || JSON.stringify(intel.company_research)}</p>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+            }
+
+            // AGENT OUTPUTS SECTION
+            if (scoreData.agent_outputs) {
+                const agents = scoreData.agent_outputs;
+                html += `
+                    <div class="analysis-section">
+                        <h3>🤖 Multi-Agent Analysis</h3>
+                `;
+
+                // Business Synergy Agent
+                if (agents.business_synergy) {
+                    const bs = agents.business_synergy;
+                    html += `
+                        <div class="agent-output">
+                            <h4>💼 Business Synergy <span class="agent-score">${bs.synergy_score || 0}/100</span></h4>
+                            <p>${bs.analysis || bs.summary || 'No analysis available'}</p>
+                        </div>
+                    `;
+                }
+
+                // Creative Collaboration Agent
+                if (agents.creative_collaboration) {
+                    const cc = agents.creative_collaboration;
+                    html += `
+                        <div class="agent-output">
+                            <h4>✨ Creative Collaboration <span class="agent-score">${cc.creativity_score || 0}/100</span></h4>
+                            <p>${cc.analysis || cc.summary || 'No analysis available'}</p>
+                        </div>
+                    `;
+                }
+
+                // Risk Compatibility Agent
+                if (agents.risk_compatibility) {
+                    const rc = agents.risk_compatibility;
+                    html += `
+                        <div class="agent-output">
+                            <h4>⚖️ Risk Compatibility <span class="agent-score">${rc.compatibility_score || 0}/100</span></h4>
+                            <p>${rc.analysis || rc.summary || 'No analysis available'}</p>
+                        </div>
+                    `;
+                }
+
+                // Strategic Growth Agent
+                if (agents.strategic_growth) {
+                    const sg = agents.strategic_growth;
+                    html += `
+                        <div class="agent-output">
+                            <h4>📈 Strategic Growth <span class="agent-score">${sg.strategic_score || 0}/100</span></h4>
+                            <p>${sg.analysis || sg.summary || 'No analysis available'}</p>
+                        </div>
+                    `;
+                }
+
+                // Tactical Connection Agent
+                if (agents.tactical_connection) {
+                    const tc = agents.tactical_connection;
+                    html += `
+                        <div class="agent-output">
+                            <h4>🎯 Tactical Connection <span class="agent-score">${tc.tactical_score || 0}/100</span></h4>
+                            <p>${tc.analysis || tc.summary || 'No analysis available'}</p>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+            }
+
+            // SYNTHESIS SECTION
+            if (scoreData.synthesis) {
+                const syn = scoreData.synthesis;
+                html += `
+                    <div class="analysis-section">
+                        <h3>💡 Strategic Synthesis</h3>
+                `;
+
+                if (syn.consensus_points && syn.consensus_points.length > 0) {
+                    html += `
+                        <div style="margin-bottom: 1.5rem;">
+                            <h4 style="color: #667eea; font-size: 0.95rem; margin-bottom: 0.5rem;">Consensus Points</h4>
+                            <ul class="opportunity-list">
+                                ${syn.consensus_points.map(point => `<li class="opportunity-item">${point}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                if (syn.top_5_opportunities && syn.top_5_opportunities.length > 0) {
+                    html += `
+                        <div>
+                            <h4 style="color: #667eea; font-size: 0.95rem; margin-bottom: 0.5rem;">Top Opportunities</h4>
+                            <ul class="opportunity-list">
+                                ${syn.top_5_opportunities.map(opp => `<li class="opportunity-item">${opp}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                if (syn.unique_insights && syn.unique_insights.length > 0) {
+                    html += `
+                        <div style="margin-top: 1.5rem;">
+                            <h4 style="color: #667eea; font-size: 0.95rem; margin-bottom: 0.5rem;">Unique Insights</h4>
+                            ${syn.unique_insights.map(insight => `<span class="insight-tag">${insight}</span>`).join('')}
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+            }
+
+            // QUALITY CONTROL SECTION
+            if (scoreData.quality_control) {
+                const qc = scoreData.quality_control;
+                html += `
+                    <div class="analysis-section">
+                        <h3>✅ Quality Control</h3>
+                        <div class="quality-metrics">
+                            ${qc.completeness_score ? `
+                                <div class="metric-box">
+                                    <span class="metric-value">${qc.completeness_score}%</span>
+                                    <span class="metric-label">Completeness</span>
+                                </div>
+                            ` : ''}
+                            ${qc.consistency_score ? `
+                                <div class="metric-box">
+                                    <span class="metric-value">${qc.consistency_score}%</span>
+                                    <span class="metric-label">Consistency</span>
+                                </div>
+                            ` : ''}
+                            ${qc.specificity_score ? `
+                                <div class="metric-box">
+                                    <span class="metric-value">${qc.specificity_score}%</span>
+                                    <span class="metric-label">Specificity</span>
+                                </div>
+                            ` : ''}
+                            ${qc.actionability_score ? `
+                                <div class="metric-box">
+                                    <span class="metric-value">${qc.actionability_score}%</span>
+                                    <span class="metric-label">Actionability</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // VISUALIZATIONS SECTION
+            if (scoreData.agent_outputs) {
+                html += buildVisualizationsSection(scoreData, matchIndex);
+            }
+
+            html += '</div>'; // Close v2-analysis
+            return html;
         }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+
+        // BUILD VISUALIZATIONS (4 total: radar + 3 new)
+        function buildVisualizationsSection(scoreData, matchIndex) {
+            const agents = scoreData.agent_outputs;
+
+            let html = `
+                <div class="analysis-section">
+                    <h3>📊 Analysis Visualizations</h3>
+                    <div class="visualization-grid">
+                        <div class="viz-container">
+                            <h4>Agent Performance Radar</h4>
+                            <canvas id="radar-${matchIndex}" width="300" height="300"></canvas>
+                        </div>
+                        <div class="viz-container">
+                            <h4>Synergy Breakdown</h4>
+                            <canvas id="bar-${matchIndex}" width="300" height="300"></canvas>
+                        </div>
+                        <div class="viz-container">
+                            <h4>Quality Metrics</h4>
+                            <canvas id="doughnut-${matchIndex}" width="300" height="300"></canvas>
+                        </div>
+                        <div class="viz-container">
+                            <h4>Strategic Alignment</h4>
+                            <canvas id="line-${matchIndex}" width="300" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Render charts after a small delay to ensure canvas elements exist
+            setTimeout(() => {
+                renderCharts(matchIndex, agents, scoreData.quality_control, scoreData.scoring);
+            }, 100);
+
+            return html;
         }
-        
+
+        // RENDER ALL 4 CHARTS
+        function renderCharts(matchIndex, agents, qc, scoring) {
+            // 1. RADAR CHART - Agent Scores
+            const radarCtx = document.getElementById(`radar-${matchIndex}`);
+            if (radarCtx) {
+                new Chart(radarCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Business Synergy', 'Creative Collab', 'Risk Compat', 'Strategic Growth', 'Tactical'],
+                        datasets: [{
+                            label: 'Agent Scores',
+                            data: [
+                                agents.business_synergy?.synergy_score || 0,
+                                agents.creative_collaboration?.creativity_score || 0,
+                                agents.risk_compatibility?.compatibility_score || 0,
+                                agents.strategic_growth?.strategic_score || 0,
+                                agents.tactical_connection?.tactical_score || 0
+                            ],
+                            backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 2,
+                            pointBackgroundColor: 'rgba(102, 126, 234, 1)'
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                pointLabels: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 11 } }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+
+            // 2. BAR CHART - Synergy Breakdown
+            const barCtx = document.getElementById(`bar-${matchIndex}`);
+            if (barCtx) {
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Business', 'Creative', 'Risk', 'Strategic', 'Tactical'],
+                        datasets: [{
+                            label: 'Score',
+                            data: [
+                                agents.business_synergy?.synergy_score || 0,
+                                agents.creative_collaboration?.creativity_score || 0,
+                                agents.risk_compatibility?.compatibility_score || 0,
+                                agents.strategic_growth?.strategic_score || 0,
+                                agents.tactical_connection?.tactical_score || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(102, 126, 234, 0.7)',
+                                'rgba(0, 200, 100, 0.7)',
+                                'rgba(255, 200, 0, 0.7)',
+                                'rgba(255, 100, 150, 0.7)',
+                                'rgba(100, 200, 255, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(102, 126, 234, 1)',
+                                'rgba(0, 200, 100, 1)',
+                                'rgba(255, 200, 0, 1)',
+                                'rgba(255, 100, 150, 1)',
+                                'rgba(100, 200, 255, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            x: {
+                                ticks: { color: 'rgba(255, 255, 255, 0.8)' },
+                                grid: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+
+            // 3. DOUGHNUT CHART - Quality Metrics
+            const doughnutCtx = document.getElementById(`doughnut-${matchIndex}`);
+            if (doughnutCtx && qc) {
+                new Chart(doughnutCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Completeness', 'Consistency', 'Specificity', 'Actionability'],
+                        datasets: [{
+                            data: [
+                                qc.completeness_score || 0,
+                                qc.consistency_score || 0,
+                                qc.specificity_score || 0,
+                                qc.actionability_score || 0
+                            ],
+                            backgroundColor: [
+                                'rgba(102, 126, 234, 0.7)',
+                                'rgba(0, 200, 100, 0.7)',
+                                'rgba(255, 200, 0, 0.7)',
+                                'rgba(255, 100, 150, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(102, 126, 234, 1)',
+                                'rgba(0, 200, 100, 1)',
+                                'rgba(255, 200, 0, 1)',
+                                'rgba(255, 100, 150, 1)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 10 } }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 4. LINE CHART - Strategic Alignment Over Dimensions
+            const lineCtx = document.getElementById(`line-${matchIndex}`);
+            if (lineCtx && scoring) {
+                new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Strategic', 'Operational', 'Creative', 'Risk', 'Tactical'],
+                        datasets: [{
+                            label: 'Alignment Score',
+                            data: [
+                                agents.strategic_growth?.strategic_score || 0,
+                                agents.business_synergy?.synergy_score || 0,
+                                agents.creative_collaboration?.creativity_score || 0,
+                                agents.risk_compatibility?.compatibility_score || 0,
+                                agents.tactical_connection?.tactical_score || 0
+                            ],
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: 'rgba(102, 126, 234, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            x: {
+                                ticks: { color: 'rgba(255, 255, 255, 0.8)' },
+                                grid: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+        }
+
+        // TOGGLE ANALYSIS VISIBILITY
+        function toggleAnalysis(matchIndex) {
+            const analysisSection = document.getElementById(`analysis-${matchIndex}`);
+            const toggleBtn = document.getElementById(`toggle-${matchIndex}`);
+            const matchCard = document.getElementById(`match-${matchIndex}`);
+
+            if (analysisSection) {
+                if (analysisSection.classList.contains('visible')) {
+                    analysisSection.classList.remove('visible');
+                    toggleBtn.textContent = '📊 View Full Analysis →';
+                    matchCard.classList.remove('expanded');
+                } else {
+                    analysisSection.classList.add('visible');
+                    toggleBtn.textContent = '📊 Hide Analysis ▼';
+                    matchCard.classList.add('expanded');
+                }
+            }
+        }
+
         function showIntro(introId, introBasis) {
             currentIntroId = introId;
 
-            // Parse and format the intro content
             let formattedHTML = '';
-
             try {
-                // introBasis contains numbered conversation approaches
-                // Clean up any JSON-like formatting
                 let cleanText = introBasis;
-
                 if (typeof introBasis === 'object') {
                     cleanText = JSON.stringify(introBasis, null, 2);
                 }
 
-                // Remove JSON-like key/value formatting
-                cleanText = cleanText.replace(/"(\w+)":\s*/g, ''); // Remove "key":
-                cleanText = cleanText.replace(/[\{\}]/g, ''); // Remove braces
-                cleanText = cleanText.replace(/^,/gm, ''); // Remove leading commas
+                cleanText = cleanText.replace(/"(\w+)":\s*/g, '');
+                cleanText = cleanText.replace(/[\{\}]/g, '');
+                cleanText = cleanText.replace(/^,/gm, '');
 
-                // Split by numbered approaches (Approach #1, Approach #2, Approach #3)
                 const approaches = cleanText.split(/(Approach #\d+:)/);
 
-                // Build formatted HTML
                 let approachNumber = 0;
                 formattedHTML = '<div class="intro-content">';
                 formattedHTML += '<h4 style="margin-bottom: 1rem; color: #667eea;">💡 Conversation Starters</h4>';
@@ -282,12 +837,11 @@
                         formattedHTML += `<div class="approach-item" style="margin-bottom: 1.5rem;">`;
                         formattedHTML += `<div class="approach-number" style="background: #667eea; color: white; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; margin-bottom: 0.5rem;">${approachNumber}</div>`;
                     } else {
-                        // Clean up the approach text
                         let cleanedApproach = part
-                            .replace(/^\s*"/, '') // Remove leading quote
-                            .replace(/"\s*$/, '') // Remove trailing quote
-                            .replace(/\\"/g, '"') // Unescape quotes
-                            .replace(/\n\n+/g, '\n') // Remove extra newlines
+                            .replace(/^\s*"/, '')
+                            .replace(/"\s*$/, '')
+                            .replace(/\\"/g, '"')
+                            .replace(/\n\n+/g, '\n')
                             .trim();
 
                         formattedHTML += `<p style="line-height: 1.6; color: #333; margin-left: 0.5rem;">${cleanedApproach}</p>`;
@@ -299,14 +853,13 @@
 
             } catch (error) {
                 console.error('Error formatting intro:', error);
-                // Fallback to simple display
                 formattedHTML = `<div style="white-space: pre-wrap; line-height: 1.6;">${introBasis}</div>`;
             }
 
             document.getElementById('modalContent').innerHTML = formattedHTML;
             document.getElementById('introModal').classList.remove('hidden');
         }
-        
+
         // Generate Top 3 with progress tracking
         document.getElementById('generateTop3').addEventListener('click', async () => {
             const btn = document.getElementById('generateTop3');
@@ -315,27 +868,22 @@
             const progressFill = document.getElementById('top3ProgressFill');
             const matchesContainer = document.getElementById('top3Matches');
 
-            // Disable button and clear previous results
             btn.disabled = true;
             matchesContainer.innerHTML = '';
             progressBox.classList.add('active');
 
-            // Progress simulation - estimated 30-60 seconds for 3 matches (3-stage research per match)
             let progress = 0;
             const progressSteps = [
                 { progress: 8, message: 'Analyzing your profile...' },
                 { progress: 16, message: 'Scoring all potential matches...' },
                 { progress: 24, message: 'Selecting top 3 candidates...' },
-                { progress: 32, message: 'Match 1/3: Researching industry trends & market dynamics...' },
-                { progress: 40, message: 'Match 1/3: Deep-diving into company & individual backgrounds...' },
-                { progress: 48, message: 'Match 1/3: Synthesizing strategic introduction...' },
-                { progress: 56, message: 'Match 2/3: Researching industry trends & market dynamics...' },
-                { progress: 64, message: 'Match 2/3: Deep-diving into company & individual backgrounds...' },
-                { progress: 72, message: 'Match 2/3: Synthesizing strategic introduction...' },
-                { progress: 80, message: 'Match 3/3: Researching industry trends & market dynamics...' },
-                { progress: 88, message: 'Match 3/3: Deep-diving into company & individual backgrounds...' },
-                { progress: 94, message: 'Match 3/3: Synthesizing strategic introduction...' },
-                { progress: 98, message: 'Finalizing your research-backed matches...' }
+                { progress: 32, message: 'Match 1/3: Running 5 AI agents in parallel...' },
+                { progress: 48, message: 'Match 1/3: Synthesizing strategic opportunities...' },
+                { progress: 56, message: 'Match 2/3: Running 5 AI agents in parallel...' },
+                { progress: 72, message: 'Match 2/3: Synthesizing strategic opportunities...' },
+                { progress: 80, message: 'Match 3/3: Running 5 AI agents in parallel...' },
+                { progress: 94, message: 'Match 3/3: Synthesizing strategic opportunities...' },
+                { progress: 98, message: 'Finalizing NEXUS Production analysis...' }
             ];
 
             let stepIndex = 0;
@@ -346,7 +894,7 @@
                     progressMessage.textContent = step.message;
                     stepIndex++;
                 }
-            }, 4000); // Update every 4 seconds (3-stage research is more thorough)
+            }, 3000);
 
             try {
                 const response = await fetch(`/api/generate-top3/${memberId}`, {
@@ -358,9 +906,8 @@
 
                 if (result.success) {
                     progressFill.style.width = '100%';
-                    progressMessage.textContent = `✅ Generated ${result.count} top matches! Loading results...`;
+                    progressMessage.textContent = `✅ Generated ${result.count} top matches with full V2 analysis! Loading...`;
 
-                    // Wait a moment then load dashboard
                     setTimeout(() => {
                         progressBox.classList.remove('active');
                         loadDashboard();
@@ -380,7 +927,7 @@
                 btn.disabled = false;
             }
         });
-        
+
         // Generate Brainstorm with progress tracking
         document.getElementById('generateBrainstorm').addEventListener('click', async () => {
             const btn = document.getElementById('generateBrainstorm');
@@ -389,28 +936,20 @@
             const progressFill = document.getElementById('brainstormProgressFill');
             const matchesContainer = document.getElementById('brainstormMatches');
 
-            // Disable button and clear previous results
             btn.disabled = true;
             matchesContainer.innerHTML = '';
             progressBox.classList.add('active');
 
-            // Progress simulation - estimated 2-4 minutes for 10-20 matches (3-stage research per match)
             const progressSteps = [
                 { progress: 3, message: 'Analyzing your profile...' },
                 { progress: 6, message: 'Scoring all attendees...' },
                 { progress: 9, message: 'Excluding your Top 3 matches...' },
-                { progress: 12, message: 'Deep research mode activated - this will take 2-4 minutes...' },
-                { progress: 20, message: 'Researching industry trends for matches 1-5...' },
-                { progress: 28, message: 'Deep-diving into companies & backgrounds (matches 1-5)...' },
-                { progress: 36, message: 'Synthesizing strategic introductions (matches 1-5)...' },
-                { progress: 44, message: 'Researching industry trends for matches 6-10...' },
-                { progress: 52, message: 'Deep-diving into companies & backgrounds (matches 6-10)...' },
-                { progress: 60, message: 'Synthesizing strategic introductions (matches 6-10)...' },
-                { progress: 68, message: 'Researching industry trends for matches 11-15...' },
-                { progress: 76, message: 'Deep-diving into companies & backgrounds (matches 11-15)...' },
-                { progress: 84, message: 'Synthesizing strategic introductions (matches 11-15)...' },
-                { progress: 92, message: 'Processing final matches with peripheral opportunity analysis...' },
-                { progress: 98, message: 'Finalizing all research-backed connections...' }
+                { progress: 15, message: 'Running NEXUS Production on all matches...' },
+                { progress: 30, message: 'Multi-agent analysis in progress (1-3 minutes)...' },
+                { progress: 50, message: 'Processing quality control checks...' },
+                { progress: 70, message: 'Synthesizing strategic opportunities...' },
+                { progress: 85, message: 'Generating conversation starters...' },
+                { progress: 95, message: 'Finalizing research-backed connections...' }
             ];
 
             let stepIndex = 0;
@@ -421,7 +960,7 @@
                     progressMessage.textContent = step.message;
                     stepIndex++;
                 }
-            }, 10000); // Update every 10 seconds (3-stage research is comprehensive)
+            }, 8000);
 
             try {
                 const response = await fetch(`/api/generate-brainstorm/${memberId}`, {
@@ -433,9 +972,8 @@
 
                 if (result.success) {
                     progressFill.style.width = '100%';
-                    progressMessage.textContent = `✅ Generated ${result.count} potential connections! Loading results...`;
+                    progressMessage.textContent = `✅ Generated ${result.count} connections with full V2 analysis!`;
 
-                    // Wait a moment then load dashboard
                     setTimeout(() => {
                         progressBox.classList.remove('active');
                         loadDashboard();
@@ -455,12 +993,12 @@
                 btn.disabled = false;
             }
         });
-        
+
         // Modal controls
         document.getElementById('closeModal').addEventListener('click', () => {
             document.getElementById('introModal').classList.add('hidden');
         });
-        
+
         document.getElementById('markAcknowledged').addEventListener('click', async () => {
             if (currentIntroId) {
                 await fetch(`/api/acknowledge-intro/${currentIntroId}`, { method: 'POST' });
@@ -468,26 +1006,9 @@
                 loadDashboard();
             }
         });
-        
+
         // Initial load
         loadDashboard();
-        
-        // Toggle creative collaboration ideas display
-        function toggleCreativeIdeas(event, idx) {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const button = event.target;
-            const ideasList = button.nextElementSibling;
-
-            if (ideasList.style.display === 'none') {
-                ideasList.style.display = 'block';
-                button.textContent = button.textContent.replace('View', 'Hide').replace('→', '▼');
-            } else {
-                ideasList.style.display = 'none';
-                button.textContent = button.textContent.replace('Hide', 'View').replace('▼', '→');
-            }
-        }
 
         // Auto-refresh every 30 seconds
         setInterval(loadDashboard, 30000);
