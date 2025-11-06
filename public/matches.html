@@ -203,14 +203,6 @@
                 <button class="btn btn-primary" id="generateTop3">Generate My Top 3 Matches</button>
             </div>
 
-            <div id="top3Progress" class="progress-status">
-                <div class="progress-status-header">🤖 Generating Your Top 3 Matches...</div>
-                <div class="progress-status-message" id="top3ProgressMessage">Initializing...</div>
-                <div class="progress-status-bar">
-                    <div class="progress-status-fill" id="top3ProgressFill" style="width: 0%"></div>
-                </div>
-            </div>
-
             <div id="top3Matches" class="matches-grid"></div>
         </div>
 
@@ -222,15 +214,19 @@
                 <button class="btn btn-secondary" id="generateBrainstorm">Brainstorm with Everyone</button>
             </div>
 
-            <div id="brainstormProgress" class="progress-status">
-                <div class="progress-status-header">🤖 Generating Brainstorm Matches...</div>
-                <div class="progress-status-message" id="brainstormProgressMessage">Initializing...</div>
-                <div class="progress-status-bar">
-                    <div class="progress-status-fill" id="brainstormProgressFill" style="width: 0%"></div>
-                </div>
-            </div>
-
             <div id="brainstormMatches" class="matches-grid"></div>
+        </div>
+
+        <!-- V2 Progress Overlay (reused for both Top 3 and Brainstorm) -->
+        <div class="progress-overlay" id="progressOverlay">
+            <div class="progress-box">
+                <h3 id="progressTitle">⚡ NEXUS Production Processing...</h3>
+                <p id="progressDescription">Running multi-agent analysis with parallel AI processing</p>
+                <div class="progress-stages" id="progressStages">
+                    <!-- Populated dynamically by JavaScript -->
+                </div>
+                <p class="progress-estimate" id="progressEstimate">Estimated time: ~25 seconds</p>
+            </div>
         </div>
 
         <!-- Intro Modal -->
@@ -867,43 +863,97 @@
             document.getElementById('introModal').classList.remove('hidden');
         }
 
-        // Generate Top 3 with progress tracking
+        // V2-STYLE PROGRESS OVERLAY FUNCTIONS
+        let progressInterval = null;
+        let currentStageIndex = 0;
+
+        function showProgressOverlay(title, description, estimate, stages) {
+            const overlay = document.getElementById('progressOverlay');
+            const titleEl = document.getElementById('progressTitle');
+            const descEl = document.getElementById('progressDescription');
+            const estimateEl = document.getElementById('progressEstimate');
+            const stagesEl = document.getElementById('progressStages');
+
+            titleEl.textContent = title;
+            descEl.textContent = description;
+            estimateEl.textContent = `Estimated time: ${estimate}`;
+
+            // Build stage items
+            stagesEl.innerHTML = stages.map((stage, index) => `
+                <div class="stage-item ${index === 0 ? 'active' : ''}" id="stage-${index}">
+                    ${index === 0 ? '<div class="spinner"></div>' : '<div></div>'}
+                    <span>${stage}</span>
+                </div>
+            `).join('');
+
+            overlay.classList.add('active');
+            currentStageIndex = 0;
+
+            // Animate stages
+            const stageDuration = stages.length > 0 ? (parseFloat(estimate) * 1000) / stages.length : 2000;
+            progressInterval = setInterval(() => {
+                if (currentStageIndex < stages.length - 1) {
+                    // Mark current stage as completed
+                    const currentStage = document.getElementById(`stage-${currentStageIndex}`);
+                    if (currentStage) {
+                        currentStage.classList.remove('active');
+                        currentStage.classList.add('completed');
+                        currentStage.querySelector('div').innerHTML = '';  // Remove spinner
+                    }
+
+                    // Activate next stage
+                    currentStageIndex++;
+                    const nextStage = document.getElementById(`stage-${currentStageIndex}`);
+                    if (nextStage) {
+                        nextStage.classList.add('active');
+                        nextStage.querySelector('div').innerHTML = '<div class="spinner"></div>';
+                    }
+                }
+            }, stageDuration);
+        }
+
+        function hideProgressOverlay() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+
+            // Mark all stages as completed
+            document.querySelectorAll('.stage-item').forEach(stage => {
+                stage.classList.remove('active');
+                stage.classList.add('completed');
+                stage.querySelector('div').innerHTML = '';
+            });
+
+            // Hide overlay after a brief delay
+            setTimeout(() => {
+                document.getElementById('progressOverlay').classList.remove('active');
+                currentStageIndex = 0;
+            }, 800);
+        }
+
+        // Generate Top 3 with V2-style progress overlay
         document.getElementById('generateTop3').addEventListener('click', async () => {
             const btn = document.getElementById('generateTop3');
-            const progressBox = document.getElementById('top3Progress');
-            const progressMessage = document.getElementById('top3ProgressMessage');
-            const progressFill = document.getElementById('top3ProgressFill');
-            const matchesContainer = document.getElementById('top3Matches');
+
+            showProgressOverlay(
+                '⚡ Generating Your Top 3 Matches',
+                'Running NEXUS Production with 5 parallel AI agents per match',
+                '25',
+                [
+                    'Analyzing your profile and needs',
+                    'Scoring all potential matches',
+                    'Selecting top 3 candidates',
+                    'Match 1/3: Multi-agent analysis',
+                    'Match 2/3: Multi-agent analysis',
+                    'Match 3/3: Multi-agent analysis',
+                    'Synthesizing strategic opportunities',
+                    'Quality control & fact-checking',
+                    'Generating conversation starters'
+                ]
+            );
 
             btn.disabled = true;
-            matchesContainer.innerHTML = '';
-            progressBox.classList.add('active');
-
-            let progress = 0;
-            // NEXUS Production timing: ~7-9s per match, ~25s total for 3 matches
-            const progressSteps = [
-                { progress: 5, message: 'Analyzing your profile...', duration: 800 },
-                { progress: 12, message: 'Scoring all potential matches...', duration: 1200 },
-                { progress: 20, message: 'Selecting top 3 candidates...', duration: 1000 },
-                { progress: 28, message: 'Match 1/3: Running 5 AI agents in parallel...', duration: 2500 },
-                { progress: 40, message: 'Match 1/3: Synthesizing strategic opportunities...', duration: 1500 },
-                { progress: 48, message: 'Match 2/3: Running 5 AI agents in parallel...', duration: 2500 },
-                { progress: 62, message: 'Match 2/3: Synthesizing strategic opportunities...', duration: 1500 },
-                { progress: 70, message: 'Match 3/3: Running 5 AI agents in parallel...', duration: 2500 },
-                { progress: 85, message: 'Match 3/3: Synthesizing strategic opportunities...', duration: 1500 },
-                { progress: 95, message: 'Finalizing NEXUS Production analysis...', duration: 1000 }
-            ];
-            // Total simulated time: ~16s (matches real NEXUS Production speed)
-
-            let stepIndex = 0;
-            const progressInterval = setInterval(() => {
-                if (stepIndex < progressSteps.length) {
-                    const step = progressSteps[stepIndex];
-                    progressFill.style.width = step.progress + '%';
-                    progressMessage.textContent = step.message;
-                    stepIndex++;
-                }
-            }, 1600); // Average step duration
 
             try {
                 const response = await fetch(`/api/generate-top3/${memberId}`, {
@@ -911,67 +961,46 @@
                 });
                 const result = await response.json();
 
-                clearInterval(progressInterval);
-
                 if (result.success) {
-                    progressFill.style.width = '100%';
-                    progressMessage.textContent = `✅ Generated ${result.count} top matches with full V2 analysis! Loading...`;
-
-                    setTimeout(() => {
-                        progressBox.classList.remove('active');
-                        loadDashboard();
-                    }, 1000);
+                    hideProgressOverlay();
+                    setTimeout(() => loadDashboard(), 1000);
                 } else {
                     throw new Error(result.error || 'Failed to generate matches');
                 }
             } catch (error) {
-                clearInterval(progressInterval);
-                progressMessage.textContent = '❌ Failed to generate matches: ' + error.message;
-                progressFill.style.width = '0%';
+                hideProgressOverlay();
+                alert('❌ Failed to generate matches: ' + error.message);
                 console.error(error);
-                setTimeout(() => {
-                    progressBox.classList.remove('active');
-                }, 3000);
             } finally {
                 btn.disabled = false;
             }
         });
 
-        // Generate Brainstorm with progress tracking
+        // Generate Brainstorm with V2-style progress overlay
         document.getElementById('generateBrainstorm').addEventListener('click', async () => {
             const btn = document.getElementById('generateBrainstorm');
-            const progressBox = document.getElementById('brainstormProgress');
-            const progressMessage = document.getElementById('brainstormProgressMessage');
-            const progressFill = document.getElementById('brainstormProgressFill');
-            const matchesContainer = document.getElementById('brainstormMatches');
+
+            showProgressOverlay(
+                '💡 Generating Brainstorm Matches',
+                'Processing all members with NEXUS Production multi-agent analysis',
+                '45',
+                [
+                    'Analyzing your profile',
+                    'Scoring all attendees',
+                    'Excluding your Top 3 matches',
+                    'Running NEXUS Production (batch 1/3)',
+                    'Multi-agent analysis (batch 1/3)',
+                    'Running NEXUS Production (batch 2/3)',
+                    'Multi-agent analysis (batch 2/3)',
+                    'Running NEXUS Production (batch 3/3)',
+                    'Multi-agent analysis (batch 3/3)',
+                    'Quality control & fact-checking',
+                    'Synthesizing strategic opportunities',
+                    'Generating conversation starters'
+                ]
+            );
 
             btn.disabled = true;
-            matchesContainer.innerHTML = '';
-            progressBox.classList.add('active');
-
-            // NEXUS Production timing for ~10 members: ~8s each, ~80s total, but shows quicker with batching
-            const progressSteps = [
-                { progress: 5, message: 'Analyzing your profile...', duration: 1000 },
-                { progress: 10, message: 'Scoring all attendees...', duration: 2000 },
-                { progress: 15, message: 'Excluding your Top 3 matches...', duration: 1000 },
-                { progress: 22, message: 'Running NEXUS Production on all matches...', duration: 3000 },
-                { progress: 35, message: 'Processing batch 1/3 with multi-agent analysis...', duration: 8000 },
-                { progress: 55, message: 'Processing batch 2/3 with quality control...', duration: 8000 },
-                { progress: 75, message: 'Processing batch 3/3, synthesizing opportunities...', duration: 8000 },
-                { progress: 88, message: 'Generating conversation starters...', duration: 4000 },
-                { progress: 96, message: 'Finalizing research-backed connections...', duration: 2000 }
-            ];
-            // Total simulated time: ~37s (realistic for 10 members with batching)
-
-            let stepIndex = 0;
-            const progressInterval = setInterval(() => {
-                if (stepIndex < progressSteps.length) {
-                    const step = progressSteps[stepIndex];
-                    progressFill.style.width = step.progress + '%';
-                    progressMessage.textContent = step.message;
-                    stepIndex++;
-                }
-            }, 4100); // Average step duration
 
             try {
                 const response = await fetch(`/api/generate-brainstorm/${memberId}`, {
@@ -979,27 +1008,16 @@
                 });
                 const result = await response.json();
 
-                clearInterval(progressInterval);
-
                 if (result.success) {
-                    progressFill.style.width = '100%';
-                    progressMessage.textContent = `✅ Generated ${result.count} connections with full V2 analysis!`;
-
-                    setTimeout(() => {
-                        progressBox.classList.remove('active');
-                        loadDashboard();
-                    }, 1000);
+                    hideProgressOverlay();
+                    setTimeout(() => loadDashboard(), 1000);
                 } else {
                     throw new Error(result.error || 'Failed to generate brainstorm matches');
                 }
             } catch (error) {
-                clearInterval(progressInterval);
-                progressMessage.textContent = '❌ Failed to generate brainstorm: ' + error.message;
-                progressFill.style.width = '0%';
+                hideProgressOverlay();
+                alert('❌ Failed to generate brainstorm: ' + error.message);
                 console.error(error);
-                setTimeout(() => {
-                    progressBox.classList.remove('active');
-                }, 3000);
             } finally {
                 btn.disabled = false;
             }
