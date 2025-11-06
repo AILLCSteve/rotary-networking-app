@@ -1084,9 +1084,14 @@ tr:hover {
 }
 
 .stage-item span {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.6);  /* Dimmed when inactive */
   font-size: 0.95rem;
   flex: 1;
+}
+
+.stage-item.active span {
+  color: #ffffff;  /* Bright white when active */
+  font-weight: 600;
 }
 
 .stage-item.completed span {
@@ -1151,8 +1156,8 @@ p, li, span, div {
 
 /* Very subtle frost ONLY for major cards, not text containers */
 .card {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(2px);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
