@@ -1288,7 +1288,7 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (for_member_id, to_member_id, tier)
           DO UPDATE SET score = $5, score_breakdown = $6, rationale_ops = $7, creative_angle = $8, intro_basis = $9
-        `, [introId, memberId, match.member_id, 'brainstorm', nexusResult.score, JSON.stringify(scoreData), JSON.stringify(rationaleOps), creativeAngle, introBasisString]);
+        `, [introId, memberId, match.member_id, 'brainstorm', nexusResult.score, JSON.stringify(scoreData), rationaleOps, creativeAngle, introBasisString]);
 
         console.log(`   ✅ NEXUS Production complete: ${match.name} (${nexusResult.score}/100) [${nexusResult.processing_time}s, cache: ${nexusResult.semantic_cache_hit ? 'HIT' : 'MISS'}]`);
       } catch (error) {

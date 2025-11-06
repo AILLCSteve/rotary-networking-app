@@ -907,6 +907,12 @@
                     if (nextStage) {
                         nextStage.classList.add('active');
                         nextStage.querySelector('div').innerHTML = '<div class="spinner"></div>';
+
+                        // Auto-scroll to active stage
+                        const progressBox = document.querySelector('.progress-box');
+                        if (progressBox) {
+                            nextStage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                     }
                 }
             }, stageDuration);
