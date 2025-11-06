@@ -181,10 +181,47 @@
 
         /* V2 LEGACY FORMAT STYLES */
         .v2-format {
-            background: rgba(255, 255, 255, 0.04);
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 2px solid rgba(79, 172, 254, 0.3);
             padding: 2rem;
             margin-bottom: 2rem;
+            cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .v2-format:hover {
+            border-color: rgba(79, 172, 254, 0.6);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.2);
+        }
+
+        /* Compact mode - show only preview */
+        .v2-format.compact .layer-section {
+            display: none;
+        }
+
+        /* Expanded mode - full width, show everything */
+        .v2-format.expanded {
+            grid-column: 1 / -1;
+            cursor: default;
+            transform: none;
+        }
+
+        .v2-format.expanded:hover {
+            transform: none;
+        }
+
+        /* Faded mode - other cards when one is expanded */
+        .v2-format.faded {
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
 
         .match-header-v2 {
@@ -192,6 +229,10 @@
             margin-bottom: 2rem;
             padding-bottom: 1.5rem;
             border-bottom: 2px solid rgba(79, 172, 254, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: -2rem -2rem 2rem -2rem;
         }
 
         .match-header-v2 h3 {
@@ -209,7 +250,9 @@
         .score-hero {
             text-align: center;
             padding: 2rem;
-            background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(0, 242, 254, 0.1));
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.15), rgba(0, 242, 254, 0.15));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border-radius: 16px;
             margin-bottom: 2rem;
             border: 2px solid rgba(79, 172, 254, 0.3);
@@ -244,7 +287,9 @@
         .layer-section {
             margin-bottom: 2.5rem;
             padding: 2rem;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border-radius: 16px;
             border: 1px solid rgba(79, 172, 254, 0.2);
         }
@@ -476,7 +521,7 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format" id="match-${matchIndex}">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
                     <!-- HEADER -->
                     <div class="match-header-v2">
                         <h3>${match.name}</h3>
@@ -743,6 +788,41 @@
                     </div>
                 `;
             }).filter(html => html).join('');
+        }
+
+        // ==============================================
+        // CLICK-TO-EXPAND FUNCTIONALITY
+        // ==============================================
+
+        function toggleMatchExpansion(matchIndex, containerId) {
+            const clickedCard = document.getElementById(`match-${matchIndex}`);
+            const container = document.getElementById(containerId);
+            const allCards = container.querySelectorAll('.v2-format');
+
+            // If this card is already expanded, collapse all back to compact
+            if (clickedCard.classList.contains('expanded')) {
+                allCards.forEach(card => {
+                    card.classList.remove('expanded', 'faded');
+                    card.classList.add('compact');
+                });
+                return;
+            }
+
+            // Expand this card, fade others
+            allCards.forEach((card, index) => {
+                if (card.id === `match-${matchIndex}`) {
+                    card.classList.remove('compact', 'faded');
+                    card.classList.add('expanded');
+
+                    // Scroll to expanded card smoothly
+                    setTimeout(() => {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                } else {
+                    card.classList.remove('compact', 'expanded');
+                    card.classList.add('faded');
+                }
+            });
         }
 
         // V2-STYLE PROGRESS OVERLAY FUNCTIONS
