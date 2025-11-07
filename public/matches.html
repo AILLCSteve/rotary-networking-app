@@ -542,12 +542,39 @@
                     <!-- LAYER 5: VISUALIZATION -->
                     <div class="layer-section layer-5">
                         <h3 class="layer-title">📊 LAYER 5: Multi-Dimensional Score Breakdown</h3>
+
+                        <!-- Row 1: Radar + Agent Performance -->
                         <div class="visualization-container">
                             <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
                                 <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="confidence-matrix" id="confidenceMatrix-${matchIndex}">
-                                <!-- Filled by renderConfidenceMatrix -->
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Agent Performance</h4>
+                                <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Synergy Breakdown + Opportunity Timing -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Synergy Distribution</h4>
+                                <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Opportunity Timing</h4>
+                                <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Value Exchange + Match Strengths -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Value Exchange</h4>
+                                <canvas id="valueExchange-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                            <div class="confidence-matrix" id="matchStrengths-${matchIndex}">
+                                <!-- Filled by renderMatchStrengths -->
                             </div>
                         </div>
                     </div>
@@ -637,7 +664,11 @@
                             agentKeys: scoreData.agent_outputs ? Object.keys(scoreData.agent_outputs) : []
                         });
                         renderRadarChart(matchIndex, scoreData.scoring.dimension_scores);
-                        renderConfidenceMatrix(matchIndex, scoreData.scoring.confidence);
+                        renderAgentBarChart(matchIndex, scoreData.agent_outputs);
+                        renderSynergyDoughnut(matchIndex, scoreData.scoring.dimension_scores);
+                        renderOpportunityTiming(matchIndex, scoreData.agent_outputs, scoreData.scoring);
+                        renderValueExchange(matchIndex, scoreData.agent_outputs);
+                        renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring);
                         renderAgentOutputs(matchIndex, scoreData.agent_outputs);
                     } else {
                         console.warn(`Match ${matchIndex} missing scoreData or scoring:`, {
@@ -721,6 +752,256 @@
                     }
                 }
             });
+        }
+
+        function renderAgentBarChart(matchIndex, agentOutputs) {
+            const ctx = document.getElementById(`agentBarChart-${matchIndex}`);
+            if (!ctx) return;
+
+            const scores = {
+                'Business Synergy': agentOutputs?.business_synergy?.synergy_score || 0,
+                'Creative Collab': agentOutputs?.creative_collaboration?.creativity_score || 0,
+                'Risk Assessment': agentOutputs?.risk_compatibility?.compatibility_score || 0,
+                'Strategic Growth': agentOutputs?.strategic_growth?.strategic_score || 0,
+                'Tactical Planning': agentOutputs?.tactical_connection?.tactical_score || 0
+            };
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(scores),
+                    datasets: [{
+                        label: 'Agent Scores',
+                        data: Object.values(scores),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(0, 242, 254, 0.8)',
+                            'rgba(16, 185, 129, 0.8)'
+                        ],
+                        borderColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#4facfe',
+                            '#00f2fe',
+                            '#10b981'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 11 } },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function renderSynergyDoughnut(matchIndex, dimensionScores) {
+            const ctx = document.getElementById(`synergyDoughnut-${matchIndex}`);
+            if (!ctx) return;
+
+            const scores = {
+                'Strategic Synergy': dimensionScores?.strategic_synergy || 0,
+                'Tactical Value': dimensionScores?.tactical_value || 0,
+                'Innovation': dimensionScores?.innovation_potential || 0,
+                'Risk/Compat': dimensionScores?.risk_compatibility || 0,
+                'Network Effects': dimensionScores?.network_effects || 0,
+                'Temporal': dimensionScores?.temporal_urgency || 0
+            };
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(scores),
+                    datasets: [{
+                        data: Object.values(scores),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(0, 242, 254, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(251, 146, 60, 0.8)'
+                        ],
+                        borderColor: '#1a1a2e',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: 'rgba(255,255,255,0.9)',
+                                font: { size: 11 },
+                                padding: 10
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderOpportunityTiming(matchIndex, agentOutputs, scoring) {
+            const ctx = document.getElementById(`opportunityTiming-${matchIndex}`);
+            if (!ctx) return;
+
+            // Extract timing and urgency insights
+            const strategic = agentOutputs?.strategic_growth?.strategic_score || 0;
+            const tactical = agentOutputs?.tactical_connection?.tactical_score || 0;
+            const temporal = scoring?.dimension_scores?.temporal_urgency || 60;
+
+            const labels = ['Immediate Wins', 'Short-Term Growth', 'Long-Term Strategic'];
+            const data = [tactical, (tactical + strategic) / 2, strategic];
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Opportunity Value',
+                        data: data,
+                        fill: true,
+                        backgroundColor: 'rgba(79, 172, 254, 0.3)',
+                        borderColor: '#4facfe',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#00f2fe',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        x: {
+                            ticks: { color: 'rgba(255,255,255,0.9)' },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function renderValueExchange(matchIndex, agentOutputs) {
+            const ctx = document.getElementById(`valueExchange-${matchIndex}`);
+            if (!ctx) return;
+
+            // Show what each person brings vs needs (complementary exchange)
+            const businessValue = agentOutputs?.business_synergy?.synergy_score || 0;
+            const creativeValue = agentOutputs?.creative_collaboration?.creativity_score || 0;
+            const networkValue = agentOutputs?.strategic_growth?.strategic_score || 0;
+
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Business Assets', 'Creative Collaboration', 'Network Access', 'Strategic Alignment', 'Resource Sharing'],
+                    datasets: [{
+                        label: 'Mutual Value',
+                        data: [businessValue, creativeValue, networkValue, businessValue * 0.9, creativeValue * 0.85],
+                        backgroundColor: 'rgba(16, 185, 129, 0.3)',
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#10b981'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)',
+                                backdropColor: 'transparent'
+                            },
+                            grid: { color: 'rgba(255,255,255,0.2)' },
+                            angleLines: { color: 'rgba(255,255,255,0.2)' },
+                            pointLabels: {
+                                color: 'rgba(255,255,255,0.9)',
+                                font: { size: 10, weight: '600' }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function renderMatchStrengths(matchIndex, synthesis, scoring) {
+            const container = document.getElementById(`matchStrengths-${matchIndex}`);
+            if (!container) return;
+
+            // Extract key strengths from synthesis
+            const opportunities = synthesis?.top_5_opportunities || [];
+            const dimensionScores = scoring?.dimension_scores || {};
+
+            // Calculate top strengths
+            const strengths = [
+                { label: 'Strategic Synergy', value: dimensionScores.strategic_synergy || 0 },
+                { label: 'Innovation Potential', value: dimensionScores.innovation_potential || 0 },
+                { label: 'Network Effects', value: dimensionScores.network_effects || 0 },
+                { label: 'Tactical Value', value: dimensionScores.tactical_value || 0 }
+            ].sort((a, b) => b.value - a.value);
+
+            const topOpportunities = opportunities.slice(0, 3);
+
+            container.innerHTML = `
+                <div style="padding: 1rem;">
+                    <h4 style="color: #4facfe; margin-bottom: 1rem;">Top Match Strengths</h4>
+                    ${strengths.map((s, i) => `
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="font-size: 0.9rem; font-weight: 600;">${i + 1}. ${s.label}</span>
+                                <span style="color: #10b981; font-weight: 700;">${Math.round(s.value)}</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #4facfe, #00f2fe); height: 100%; width: ${s.value}%; transition: width 0.3s;"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+
+                    ${topOpportunities.length > 0 ? `
+                        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <h5 style="color: #00f2fe; margin-bottom: 0.75rem; font-size: 0.95rem;">Key Opportunities</h5>
+                            ${topOpportunities.map((opp, i) => `
+                                <div style="margin-bottom: 0.5rem; padding-left: 1rem; border-left: 2px solid #10b981; font-size: 0.85rem; opacity: 0.9;">
+                                    ${opp}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
         }
 
         function renderConfidenceMatrix(matchIndex, confidence) {
