@@ -488,6 +488,8 @@
         function displayMatches(matches, containerId, isTop3) {
             const container = document.getElementById(containerId);
 
+            console.log(`📊 Displaying ${matches?.length || 0} matches in ${containerId}`, { isTop3 });
+
             if (!matches || matches.length === 0) {
                 container.innerHTML = '<p class="no-matches">No matches generated yet. Click the button above to generate matches.</p>';
                 return;
@@ -497,24 +499,38 @@
                 // Parse score breakdown if available
                 let scoreData = null;
 
+                console.log(`   Match ${matchIndex}: ${match.name} - has score_breakdown: ${!!match.score_breakdown}`);
+
                 if (match.score_breakdown) {
                     try {
                         scoreData = typeof match.score_breakdown === 'string'
                             ? JSON.parse(match.score_breakdown)
                             : match.score_breakdown;
+                        console.log(`   ✅ Parsed score_breakdown for ${match.name}`, {
+                            hasScoring: !!scoreData.scoring,
+                            hasAgentOutputs: !!scoreData.agent_outputs,
+                            hasSynthesis: !!scoreData.synthesis
+                        });
                     } catch (e) {
                         console.error('Error parsing score breakdown:', e);
                         scoreData = null;
                     }
                 }
 
-                // If no V2 data, show minimal card
+                // If no V2 data, show minimal card with regenerate hint
                 if (!scoreData || !scoreData.scoring) {
+                    console.warn(`   ⚠️  Match ${matchIndex} (${match.name}) missing V2 data - showing minimal card`);
                     return `
-                    <div class="match-card" id="match-${matchIndex}">
+                    <div class="match-card" id="match-${matchIndex}" style="padding: 2rem; background: rgba(255, 50, 50, 0.1); border: 2px solid rgba(255, 100, 100, 0.3);">
                         <h4>${match.name}</h4>
                         <p>${match.org} • ${match.role}</p>
-                        <p class="no-matches">Analysis data not available for this match.</p>
+                        <p style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                            ⚠️ <strong>Deep AI analysis not available for this match.</strong>
+                            <br><br>
+                            This match was generated before the NEXUS Production system was implemented.
+                            <br><br>
+                            <strong>Solution:</strong> Click the "Brainstorm with Everyone" button above to regenerate all matches with full AI analysis and visualizations.
+                        </p>
                     </div>
                     `;
                 }
