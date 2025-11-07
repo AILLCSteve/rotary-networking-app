@@ -616,6 +616,7 @@
 
             // Render all charts and matrices after DOM is updated
             setTimeout(() => {
+                console.log(`Starting visualization rendering for ${matches.length} matches...`);
                 matches.forEach((match, matchIndex) => {
                     let scoreData = null;
                     if (match.score_breakdown) {
@@ -624,13 +625,25 @@
                                 ? JSON.parse(match.score_breakdown)
                                 : match.score_breakdown;
                         } catch (e) {
+                            console.error(`Failed to parse score_breakdown for match ${matchIndex}:`, e);
                             return;
                         }
                     }
                     if (scoreData && scoreData.scoring) {
+                        console.log(`Match ${matchIndex} data structure:`, {
+                            hasDimensionScores: !!scoreData.scoring.dimension_scores,
+                            hasConfidence: !!scoreData.scoring.confidence,
+                            hasAgentOutputs: !!scoreData.agent_outputs,
+                            agentKeys: scoreData.agent_outputs ? Object.keys(scoreData.agent_outputs) : []
+                        });
                         renderRadarChart(matchIndex, scoreData.scoring.dimension_scores);
                         renderConfidenceMatrix(matchIndex, scoreData.scoring.confidence);
                         renderAgentOutputs(matchIndex, scoreData.agent_outputs);
+                    } else {
+                        console.warn(`Match ${matchIndex} missing scoreData or scoring:`, {
+                            hasScoreData: !!scoreData,
+                            hasScoring: scoreData?.scoring
+                        });
                     }
                 });
             }, 100);
@@ -712,7 +725,12 @@
 
         function renderConfidenceMatrix(matchIndex, confidence) {
             const matrix = document.getElementById(`confidenceMatrix-${matchIndex}`);
-            if (!matrix) return;
+            if (!matrix) {
+                console.warn(`Confidence matrix element not found for match ${matchIndex}`);
+                return;
+            }
+
+            console.log(`Rendering confidence matrix for match ${matchIndex}:`, confidence);
 
             matrix.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;">
@@ -738,7 +756,16 @@
 
         function renderAgentOutputs(matchIndex, agentOutputs) {
             const grid = document.getElementById(`agentGrid-${matchIndex}`);
-            if (!grid || !agentOutputs) return;
+            if (!grid) {
+                console.warn(`Agent grid element not found for match ${matchIndex}`);
+                return;
+            }
+            if (!agentOutputs) {
+                console.warn(`No agent outputs data for match ${matchIndex}`);
+                return;
+            }
+
+            console.log(`Rendering agent outputs for match ${matchIndex}:`, agentOutputs);
 
             const agentData = [
                 { name: 'Business Synergy Analyst', key: 'business_synergy', scoreKey: 'synergy_score', icon: '💼' },
@@ -748,9 +775,12 @@
                 { name: 'Tactical Connection Planner', key: 'tactical_connection', scoreKey: 'tactical_score', icon: '🎯' }
             ];
 
-            grid.innerHTML = agentData.map(agent => {
+            const renderedCards = agentData.map(agent => {
                 const data = agentOutputs[agent.key];
-                if (!data) return '';
+                if (!data) {
+                    console.warn(`No data for agent ${agent.key} in match ${matchIndex}`);
+                    return '';
+                }
 
                 // Extract meaningful fields (skip score/confidence/conversation_starters)
                 const insights = [];
@@ -787,7 +817,10 @@
                         </div>
                     </div>
                 `;
-            }).filter(html => html).join('');
+            }).filter(html => html);
+
+            console.log(`Rendered ${renderedCards.length} agent cards for match ${matchIndex}`);
+            grid.innerHTML = renderedCards.join('');
         }
 
         // ==============================================
