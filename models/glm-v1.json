@@ -1,0 +1,38 @@
+{
+  "version": "v1.0.0",
+  "trained_at": "2025-01-06T00:00:00Z",
+  "training_samples": 0,
+  "coefficients": {
+    "intercept": 0.4,
+    "cos_sim": 0.8,
+    "ind_same": 0.25,
+    "geo_same_city": 0.1,
+    "b2b_pair": 0.25,
+    "b2c_pair": 0.2,
+    "need_asset_bidirectional": 0.7,
+    "need_asset_unidirectional": 0.2,
+    "constraint_overlap": 0.2,
+    "seniority_pair": 0.15,
+    "comm_style_affinity": 0.4
+  },
+  "nonlinear": {
+    "cos_sim_sq": 0.3,
+    "need_asset_bidirectional_sq": 0.4
+  },
+  "platt_calibration": {
+    "a": 1.0,
+    "b": 0.0
+  },
+  "feature_stats": {
+    "cos_sim": { "mean": 0.5, "std": 0.2 },
+    "ind_same": { "mean": 0.15, "std": 0.36 },
+    "geo_same_city": { "mean": 0.3, "std": 0.46 },
+    "b2b_pair": { "mean": 0.5, "std": 0.5 },
+    "b2c_pair": { "mean": 0.5, "std": 0.5 },
+    "need_asset_bidirectional": { "mean": 0.2, "std": 0.2 },
+    "need_asset_unidirectional": { "mean": 0.3, "std": 0.3 },
+    "constraint_overlap": { "mean": 0.1, "std": 0.15 },
+    "seniority_pair": { "mean": 0.5, "std": 0.2 },
+    "comm_style_affinity": { "mean": 0.7, "std": 0.2 }
+  }
+}

@@ -11,6 +11,10 @@ const nexusV2 = require('./nexus-v2');
 const nexusV35 = require('./nexus-v3.5');
 const nexusProduction = require('./nexus-production');
 
+// V4.1 Scoring System
+const { scorePair } = require('./lib/scoring-v4_1');
+const { isValidScore } = require('./lib/safety');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -171,11 +175,32 @@ app.get('/api/debug/matches/:memberId', async (req, res) => {
     scored.sort((a, b) => b.score - a.score);
 
     debugInfo.candidates = scored;
+    // V4.1 Enhanced Diagnostics
+    const validScores = scored.filter(s => isValidScore(s.score)).map(s => s.score);
+    const invalidCount = scored.filter(s => !isValidScore(s.score)).length;
+
+    let scoreStats = {};
+    if (validScores.length > 0) {
+      validScores.sort((a, b) => a - b);
+      const mean = validScores.reduce((sum, s) => sum + s, 0) / validScores.length;
+      const median = validScores[Math.floor(validScores.length / 2)];
+      const variance = validScores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / validScores.length;
+      scoreStats = {
+        min: Math.round(validScores[0] * 10) / 10,
+        max: Math.round(validScores[validScores.length - 1] * 10) / 10,
+        mean: Math.round(mean * 10) / 10,
+        median: Math.round(median * 10) / 10,
+        std: Math.round(Math.sqrt(variance) * 10) / 10
+      };
+    }
+
     debugInfo.summary = {
       totalCandidates: scored.length,
       validMatches: scored.filter(s => s.score > 0).length,
+      invalidScores: invalidCount,
       averageScore: (scored.reduce((sum, s) => sum + s.score, 0) / scored.length).toFixed(2),
       averageSimilarity: (scored.reduce((sum, s) => sum + parseFloat(s.similarity || 0), 0) / scored.length).toFixed(4),
+      scoreStats,
       scoreDistribution: {
         excellent: scored.filter(s => s.score >= 75).length,
         strong: scored.filter(s => s.score >= 60 && s.score < 75).length,
@@ -183,6 +208,7 @@ app.get('/api/debug/matches/:memberId', async (req, res) => {
         moderate: scored.filter(s => s.score >= 40 && s.score < 50).length,
         baseline: scored.filter(s => s.score >= 30 && s.score < 40).length
       },
+      v4_1_config: V4_1_CONFIG,
       philosophy: 'NO FILTERING - All valid matches included (every business professional has networking potential)'
     };
 
@@ -191,6 +217,57 @@ app.get('/api/debug/matches/:memberId', async (req, res) => {
     res.json(debugInfo);
   } catch (error) {
     console.error('Debug endpoint error:', error);
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
+// V4.1 SMOKE TEST ENDPOINT
+app.get('/api/debug/v4_1-smoke/:member1/:member2', async (req, res) => {
+  try {
+    const { member1: id1, member2: id2 } = req.params;
+    console.log(`🧪 V4.1 SMOKE TEST: ${id1} ↔ ${id2}`);
+
+    const m1 = await db.get('SELECT * FROM members WHERE member_id = $1', [id1]);
+    const m2 = await db.get('SELECT * FROM members WHERE member_id = $1', [id2]);
+
+    if (!m1 || !m2) {
+      return res.status(404).json({ error: 'One or both members not found' });
+    }
+
+    // Get embeddings
+    const v1 = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [id1]);
+    const v2 = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [id2]);
+
+    if (!v1 || !v2) {
+      return res.status(404).json({ error: 'One or both embeddings not found' });
+    }
+
+    const emb1 = JSON.parse(v1.embedding_ops);
+    const emb2 = JSON.parse(v2.embedding_ops);
+    const similarity = cosineSimilarity(emb1, emb2);
+
+    console.log(`📊 Similarity: ${similarity.toFixed(4)}`);
+
+    // Run V4.1 scoring
+    const v41Result = scorePair(m1, m2, similarity);
+
+    res.json({
+      members: {
+        member1: { id: m1.member_id, name: m1.name, org: m1.org },
+        member2: { id: m2.member_id, name: m2.name, org: m2.org }
+      },
+      similarity: similarity.toFixed(4),
+      v4_1_result: v41Result,
+      v4_1_config: V4_1_CONFIG,
+      validation: {
+        score_is_finite: isFinite(v41Result.final_score),
+        score_in_range: v41Result.final_score >= 0 && v41Result.final_score <= 100,
+        has_ci: !!v41Result.variance?.model_ci95,
+        has_explain: !!v41Result.explain
+      }
+    });
+  } catch (error) {
+    console.error('V4.1 smoke test error:', error);
     res.status(500).json({ error: error.message, stack: error.stack });
   }
 });
@@ -1010,7 +1087,8 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
     console.log(`✅ Scoring complete`);
 
     // Filter out self-matches and sort by initial scores
-    const filtered = scored.filter(s => s.score > 0);
+    // V4.1 FIX: Only filter invalid scores (NaN/Infinity), keep ALL valid scores including 0
+    const filtered = scored.filter(s => typeof s.score === 'number' && isFinite(s.score));
     filtered.sort((a, b) => b.score - a.score);
 
     console.log(`📊 Initial scoring: ${scored.length} candidates, ${filtered.length} valid matches`);
@@ -1213,7 +1291,8 @@ app.post('/api/generate-brainstorm/:memberId', async (req, res) => {
 
     // Filter only to exclude self-matches (score = 0), then sort by score
     // NO THRESHOLD - every business professional has networking potential
-    const filtered = scored.filter(c => c.score > 0); // Only removes self-matches and errors
+    // V4.1 FIX: Only filter invalid scores (NaN/Infinity), keep ALL valid scores including 0
+    const filtered = scored.filter(c => typeof c.score === 'number' && isFinite(c.score));
     filtered.sort((a, b) => b.score - a.score);
 
     // EXCLUDE TOP 3 from brainstorm - they're already shown separately
@@ -1466,6 +1545,110 @@ app.get('/api/dashboard/stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to load stats' });
   }
 });
+
+// ============================================================================
+// V4.1 FEATURE FLAG & A/B TESTING ENDPOINTS
+// ============================================================================
+
+// Feature flag management
+let V4_1_CONFIG = {
+  enabled: process.env.ENABLE_V4_1_SCORING === 'true',
+  rollout_percent: parseInt(process.env.V4_1_ROLLOUT_PERCENT || '0', 10)
+};
+
+app.post('/api/admin/feature-flags', async (req, res) => {
+  try {
+    const { enable_v4_1, rollout_percent } = req.body;
+
+    if (enable_v4_1 !== undefined) {
+      V4_1_CONFIG.enabled = !!enable_v4_1;
+      console.log(`🧪 V4.1 Scoring ${V4_1_CONFIG.enabled ? 'ENABLED' : 'DISABLED'}`);
+    }
+
+    if (rollout_percent !== undefined) {
+      const pct = Math.min(100, Math.max(0, parseInt(rollout_percent, 10)));
+      V4_1_CONFIG.rollout_percent = pct;
+      console.log(`🎚️  V4.1 Rollout set to ${pct}%`);
+    }
+
+    res.json({
+      success: true,
+      config: V4_1_CONFIG
+    });
+  } catch (error) {
+    console.error('Feature flags error:', error);
+    res.status(500).json({ error: 'Failed to update feature flags' });
+  }
+});
+
+app.get('/api/admin/feature-flags', (req, res) => {
+  res.json(V4_1_CONFIG);
+});
+
+// A/B comparison statistics
+app.get('/api/admin/ab-stats', async (req, res) => {
+  try {
+    const rows = await db.all(`
+      SELECT
+        legacy_score,
+        v4_score,
+        difference,
+        percent_change
+      FROM score_comparisons
+      WHERE v4_score IS NOT NULL
+      ORDER BY created_at DESC
+      LIMIT 1000
+    `);
+
+    if (rows.length === 0) {
+      return res.json({
+        count: 0,
+        avg_legacy: 0,
+        avg_v4: 0,
+        avg_diff: 0,
+        std_diff: 0,
+        corr: 0,
+        message: 'No A/B comparisons yet'
+      });
+    }
+
+    const n = rows.length;
+    const avg_legacy = rows.reduce((sum, r) => sum + parseFloat(r.legacy_score), 0) / n;
+    const avg_v4 = rows.reduce((sum, r) => sum + parseFloat(r.v4_score), 0) / n;
+    const avg_diff = rows.reduce((sum, r) => sum + parseFloat(r.difference || 0), 0) / n;
+
+    const variance_diff = rows.reduce((sum, r) => {
+      const d = parseFloat(r.difference || 0) - avg_diff;
+      return sum + d * d;
+    }, 0) / n;
+    const std_diff = Math.sqrt(variance_diff);
+
+    // Simple correlation
+    let sumXY = 0, sumX2 = 0, sumY2 = 0;
+    rows.forEach(r => {
+      const x = parseFloat(r.legacy_score) - avg_legacy;
+      const y = parseFloat(r.v4_score) - avg_v4;
+      sumXY += x * y;
+      sumX2 += x * x;
+      sumY2 += y * y;
+    });
+    const corr = (sumX2 > 0 && sumY2 > 0) ? sumXY / Math.sqrt(sumX2 * sumY2) : 0;
+
+    res.json({
+      count: n,
+      avg_legacy: Math.round(avg_legacy * 10) / 10,
+      avg_v4: Math.round(avg_v4 * 10) / 10,
+      avg_diff: Math.round(avg_diff * 10) / 10,
+      std_diff: Math.round(std_diff * 10) / 10,
+      corr: Math.round(corr * 100) / 100
+    });
+  } catch (error) {
+    console.error('A/B stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch A/B stats' });
+  }
+});
+
+// ============================================================================
 
 // Diagnostic: Check embedding status
 app.get('/api/admin/embedding-status', async (req, res) => {
@@ -1868,6 +2051,24 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('Set OPENAI_API_KEY in .env file for AI features');
   console.log('🚀 NEXUS V2 API available at /api/v2/*');
   console.log('⚡ NEXUS V3.5+ API available at /api/v3.5/* (with SSE streaming)');
+
+  // Initialize V4.1 A/B comparison table
+  try {
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS score_comparisons (
+        id SERIAL PRIMARY KEY,
+        member_pair TEXT NOT NULL,
+        legacy_score NUMERIC NOT NULL,
+        v4_score NUMERIC,
+        difference NUMERIC,
+        percent_change NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('✅ V4.1 score_comparisons table ready');
+  } catch (err) {
+    console.warn('⚠️  Could not create score_comparisons table:', err.message);
+  }
 
   // Initialize Thompson Sampling stats
   try {

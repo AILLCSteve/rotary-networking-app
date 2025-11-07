@@ -552,6 +552,7 @@
                             <div class="grade-display">Grade: ${scoreData.grade || 'N/A'}</div>
                             <div class="processing-time">⚡ ${scoreData.processing_time || 'N/A'}s processing</div>
                             <div class="pipeline-version">🤖 ${scoreData.pipeline_version || 'NEXUS Production'}</div>
+                            ${scoreData.scoring?.variance?.model_ci95 ? `<div class="ci-display">±${Math.round((scoreData.scoring.variance.model_ci95[1] - scoreData.scoring.variance.model_ci95[0]) / 2)} pts @95%</div>` : ''}
                         </div>
                     </div>
 
@@ -591,6 +592,26 @@
                             </div>
                             <div class="confidence-matrix" id="matchStrengths-${matchIndex}">
                                 <!-- Filled by renderMatchStrengths -->
+                            </div>
+                        </div>
+
+                        <!-- Row 4: V4.1 Confidence Band + Contribution Waterfall -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Score Confidence Band</h4>
+                                <canvas id="confidenceBand-${matchIndex}" width="400" height="220"></canvas>
+                            </div>
+                            <div class="radar-container">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Contribution Waterfall</h4>
+                                <canvas id="contribWaterfall-${matchIndex}" width="400" height="220"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 5: V4.1 Cohort Percentiles -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container" style="grid-column: 1 / -1;">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Cohort Percentiles</h4>
+                                <canvas id="percentileStrip-${matchIndex}" height="160"></canvas>
                             </div>
                         </div>
                     </div>
@@ -685,6 +706,10 @@
                         renderOpportunityTiming(matchIndex, scoreData.agent_outputs, scoreData.scoring);
                         renderValueExchange(matchIndex, scoreData.agent_outputs);
                         renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring);
+                        // V4.1 Visualizations
+                        renderConfidenceBand(matchIndex, scoreData.scoring);
+                        renderContributionWaterfall(matchIndex, scoreData.scoring);
+                        renderPercentileStrip(matchIndex, scoreData.scoring);
                         renderAgentOutputs(matchIndex, scoreData.agent_outputs);
                     } else {
                         console.warn(`Match ${matchIndex} missing scoreData or scoring:`, {
@@ -1110,6 +1135,176 @@
                 </div>
             `;
         }
+
+        // ==============================================
+        // V4.1 VISUALIZATION FUNCTIONS
+        // ==============================================
+
+        function as100(x) {
+            return (typeof x === 'number' && isFinite(x)) ? Math.max(0, Math.min(100, x)) : 0;
+        }
+
+        function getDims(scoring) {
+            const d = scoring?.dimension_scores || {};
+            return [
+                as100(d.strategic_synergy),
+                as100(d.tactical_value),
+                as100(d.innovation_potential),
+                as100(d.risk_compatibility),
+                as100(d.network_effects),
+                as100(d.temporal_urgency)
+            ];
+        }
+
+        function renderConfidenceBand(matchIndex, scoring) {
+            const el = document.getElementById(`confidenceBand-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const base = as100(scoring?.base_score);
+            const final = as100(scoring?.final_score || scoring?.score);
+            const ci = scoring?.variance?.model_ci95;
+            const low = as100(ci?.[0]);
+            const high = as100(ci?.[1]);
+
+            // Skip if nothing to show
+            if (!final && !base && !ci) return;
+
+            const labels = ['Base Model', 'Final Score'];
+            const values = [base || final, final];
+
+            try {
+                new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            ci ? {
+                                label: 'CI Low',
+                                data: [low, low],
+                                fill: '+1',
+                                borderWidth: 0,
+                                backgroundColor: 'rgba(79,172,254,0.15)'
+                            } : null,
+                            ci ? {
+                                label: 'CI High',
+                                data: [high, high],
+                                borderWidth: 0
+                            } : null,
+                            {
+                                label: 'Score',
+                                data: values,
+                                borderColor: '#4facfe',
+                                backgroundColor: 'rgba(79,172,254,0.3)',
+                                borderWidth: 3,
+                                tension: 0.3
+                            }
+                        ].filter(Boolean)
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering confidence band for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderContributionWaterfall(matchIndex, scoring) {
+            const el = document.getElementById(`contribWaterfall-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const d = scoring?.dimension_scores || {};
+            const w = { S: 0.25, T: 0.20, I: 0.20, R: 0.15, N: 0.15, U: 0.05 };
+            const vals = {
+                S: w.S * as100(d.strategic_synergy),
+                T: w.T * as100(d.tactical_value),
+                I: w.I * as100(d.innovation_potential),
+                R: w.R * as100(d.risk_compatibility),
+                N: w.N * as100(d.network_effects),
+                U: w.U * as100(d.temporal_urgency)
+            };
+
+            try {
+                new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
+                        datasets: [{
+                            data: Object.values(vals),
+                            backgroundColor: [
+                                'rgba(79,172,254,0.8)',
+                                'rgba(0,242,254,0.8)',
+                                'rgba(102,126,234,0.8)',
+                                'rgba(118,75,162,0.8)',
+                                'rgba(237,66,100,0.8)',
+                                'rgba(255,159,64,0.8)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering contribution waterfall for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderPercentileStrip(matchIndex, scoring) {
+            const el = document.getElementById(`percentileStrip-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const dims = scoring?.dimension_scores ? getDims(scoring) : null;
+            if (!dims) return;
+
+            try {
+                new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
+                        datasets: [{
+                            data: dims,
+                            backgroundColor: 'rgba(79,172,254,0.8)'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            y: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering percentile strip for match ${matchIndex}:`, error);
+            }
+        }
+
+        // ==============================================
 
         function renderAgentOutputs(matchIndex, agentOutputs) {
             const grid = document.getElementById(`agentGrid-${matchIndex}`);
