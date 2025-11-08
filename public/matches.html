@@ -386,6 +386,38 @@
             border-radius: 8px;
         }
 
+        /* Clickable visualization containers */
+        .radar-container {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .radar-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3);
+        }
+
+        /* Collapse button */
+        .collapse-btn {
+            display: inline-block;
+            margin: 1rem auto;
+            padding: 0.75rem 2rem;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .collapse-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+
         .quality-metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -462,15 +494,19 @@
             <div id="brainstormMatches" class="matches-grid"></div>
         </div>
 
-        <!-- V2 Progress Overlay (reused for both Top 3 and Brainstorm) -->
-        <div class="progress-overlay" id="progressOverlay">
-            <div class="progress-box">
+        <!-- V2 Progress Overlay (reused for both Top 3, Brainstorm, and Visualizations) -->
+        <div class="progress-overlay" id="progressOverlay" onclick="closeVisualizationPopup()">
+            <div class="progress-box" id="progressBox" onclick="event.stopPropagation()">
                 <h3 id="progressTitle">⚡ NEXUS Production Processing...</h3>
                 <p id="progressDescription">Running multi-agent analysis with parallel AI processing</p>
                 <div class="progress-stages" id="progressStages">
                     <!-- Populated dynamically by JavaScript -->
                 </div>
                 <p class="progress-estimate" id="progressEstimate">Estimated time: ~25 seconds</p>
+            </div>
+            <!-- Visualization Popup Content (reuses same overlay) -->
+            <div id="vizPopupCanvas" class="progress-box" style="display: none;" onclick="event.stopPropagation()">
+                <!-- Populated by openVisualizationPopup() -->
             </div>
         </div>
 
@@ -570,9 +606,9 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
-                    <!-- HEADER -->
-                    <div class="match-header-v2">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}">
+                    <!-- HEADER (clickable to expand) -->
+                    <div class="match-header-v2" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
                         <h3>${match.name}</h3>
                         <div class="match-meta">${match.org} • ${match.role} • ${match.city || 'Location not specified'}</div>
                         ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
@@ -595,11 +631,11 @@
 
                         <!-- Row 1: Radar + Agent Performance -->
                         <div class="visualization-container">
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
                                 <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('agentBarChart-${matchIndex}', 'Agent Performance')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Agent Performance</h4>
                                 <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -607,11 +643,11 @@
 
                         <!-- Row 2: Synergy Breakdown + Opportunity Timing -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Synergy Distribution')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Synergy Distribution</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('opportunityTiming-${matchIndex}', 'Opportunity Timing')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Opportunity Timing</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -619,7 +655,7 @@
 
                         <!-- Row 3: Value Exchange + Match Strengths -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('valueExchange-${matchIndex}', 'Value Exchange')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Value Exchange</h4>
                                 <canvas id="valueExchange-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -630,11 +666,11 @@
 
                         <!-- Row 4: V4.1 Confidence Band + Contribution Waterfall -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('confidenceBand-${matchIndex}', 'Score Confidence Band')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Score Confidence Band</h4>
                                 <canvas id="confidenceBand-${matchIndex}" width="400" height="220"></canvas>
                             </div>
-                            <div class="radar-container">
+                            <div class="radar-container" onclick="openVisualizationPopup('contribWaterfall-${matchIndex}', 'Contribution Waterfall')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Contribution Waterfall</h4>
                                 <canvas id="contribWaterfall-${matchIndex}" width="400" height="220"></canvas>
                             </div>
@@ -642,11 +678,29 @@
 
                         <!-- Row 5: V4.1 Cohort Percentiles -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" style="grid-column: 1 / -1;">
+                            <div class="radar-container" style="grid-column: 1 / -1;" onclick="openVisualizationPopup('percentileStrip-${matchIndex}', 'Cohort Percentiles')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Cohort Percentiles</h4>
                                 <canvas id="percentileStrip-${matchIndex}" height="160"></canvas>
                             </div>
                         </div>
+
+                        <!-- Key Opportunities (moved from Match Strengths) -->
+                        ${scoreData.scoring?.dimension_scores ? `
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border-left: 4px solid #10b981;">
+                            <h5 style="color: #00f2fe; margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
+                            ${[
+                                { label: 'Strategic Synergy', value: scoreData.scoring.dimension_scores.strategic_synergy || 0 },
+                                { label: 'Innovation Potential', value: scoreData.scoring.dimension_scores.innovation_potential || 0 },
+                                { label: 'Network Effects', value: scoreData.scoring.dimension_scores.network_effects || 0 },
+                                { label: 'Tactical Value', value: scoreData.scoring.dimension_scores.tactical_value || 0 }
+                            ].sort((a, b) => b.value - a.value).slice(0, 3).map((opp, i) => `
+                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+                                    <strong style="color: #10b981;">${i + 1}.</strong> ${opp.label}
+                                    <span style="float: right; color: #4facfe; font-weight: 600;">${Math.round(opp.value)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
                     </div>
 
                     <!-- LAYER 2: AGENT OUTPUTS -->
@@ -704,6 +758,13 @@
                             <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; color: rgba(255,255,255,0.9);">${JSON.stringify(scoreData.intelligence, null, 2)}</pre>
                             ` : '<p style="opacity: 0.7;">No intelligence data available for this match.</p>'}
                         </div>
+                    </div>
+
+                    <!-- Collapse Button -->
+                    <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 2px solid rgba(255,255,255,0.1);">
+                        <button class="collapse-btn" onclick="collapseMatch(${matchIndex}, '${containerId}')">
+                            ⬆ Collapse Match
+                        </button>
                     </div>
                 </div>
                 `;
@@ -1106,8 +1167,8 @@
             const topOpportunities = opportunities.slice(0, 3);
 
             container.innerHTML = `
-                <div style="padding: 1rem;">
-                    <h4 style="color: #4facfe; margin-bottom: 1rem;">Top Match Strengths</h4>
+                <div style="padding: 1.5rem;">
+                    <h4 style="color: #4facfe; margin-bottom: 1rem; text-align: center;">Top Match Strengths</h4>
                     ${strengths.map((s, i) => `
                         <div style="margin-bottom: 0.75rem;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
@@ -1124,8 +1185,8 @@
                         <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
                             <h5 style="color: #00f2fe; margin-bottom: 0.75rem; font-size: 0.95rem;">Key Opportunities</h5>
                             ${topOpportunities.map((opp, i) => `
-                                <div style="margin-bottom: 0.5rem; padding-left: 1rem; border-left: 2px solid #10b981; font-size: 0.85rem; opacity: 0.9;">
-                                    ${opp}
+                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.9rem;">
+                                    <strong>${i + 1}.</strong> ${opp.label}
                                 </div>
                             `).join('')}
                         </div>
@@ -1417,13 +1478,9 @@
             const container = document.getElementById(containerId);
             const allCards = container.querySelectorAll('.v2-format');
 
-            // If this card is already expanded, collapse all back to compact
+            // Only expand if not already expanded
             if (clickedCard.classList.contains('expanded')) {
-                allCards.forEach(card => {
-                    card.classList.remove('expanded', 'faded');
-                    card.classList.add('compact');
-                });
-                return;
+                return; // Don't collapse on click anymore - use collapse button
             }
 
             // Expand this card, fade others
@@ -1441,6 +1498,81 @@
                     card.classList.add('faded');
                 }
             });
+        }
+
+        // ==============================================
+        // COLLAPSE MATCH FUNCTION
+        // ==============================================
+
+        function collapseMatch(matchIndex, containerId) {
+            const container = document.getElementById(containerId);
+            const allCards = container.querySelectorAll('.v2-format');
+
+            allCards.forEach(card => {
+                card.classList.remove('expanded', 'faded');
+                card.classList.add('compact');
+            });
+        }
+
+        // ==============================================
+        // VISUALIZATION POPUP FUNCTIONS
+        // ==============================================
+
+        function openVisualizationPopup(canvasId, title) {
+            event.stopPropagation(); // Prevent card expansion/collapse
+
+            const sourceCanvas = document.getElementById(canvasId);
+            if (!sourceCanvas) {
+                console.error('Canvas not found:', canvasId);
+                return;
+            }
+
+            // Use the progress overlay div (same style)
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Hide progress box, show viz box
+            progressBox.style.display = 'none';
+            vizBox.style.display = 'block';
+
+            // Clear and set up the popup
+            vizBox.innerHTML = `
+                <h2 style="text-align: center; color: #4facfe; margin-bottom: 2rem; font-size: 2rem;">${title}</h2>
+                <div style="max-width: 1200px; max-height: 75vh; display: flex; justify-content: center; align-items: center;">
+                    <canvas id="popupCanvas" style="max-width: 100%; height: auto;"></canvas>
+                </div>
+                <p style="text-align: center; margin-top: 2rem; opacity: 0.7; font-size: 0.9rem;">Click anywhere to close</p>
+            `;
+
+            // Show the overlay (reuse progress overlay)
+            overlay.classList.remove('hidden');
+
+            // Clone the chart to the popup canvas
+            setTimeout(() => {
+                const popupCanvas = document.getElementById('popupCanvas');
+                if (popupCanvas && sourceCanvas) {
+                    // Copy canvas dimensions and content
+                    popupCanvas.width = sourceCanvas.width;
+                    popupCanvas.height = sourceCanvas.height;
+                    const ctx = popupCanvas.getContext('2d');
+                    ctx.drawImage(sourceCanvas, 0, 0);
+                }
+            }, 100);
+        }
+
+        function closeVisualizationPopup() {
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Only close if showing visualization (not progress)
+            if (vizBox.style.display === 'block') {
+                overlay.classList.add('hidden');
+                vizBox.style.display = 'none';
+                vizBox.innerHTML = '';
+                progressBox.style.display = 'block';
+            }
         }
 
         // V2-STYLE PROGRESS OVERLAY FUNCTIONS
