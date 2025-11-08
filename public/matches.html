@@ -664,9 +664,9 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" data-match-index="${matchIndex}">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}">
                     <!-- Clickable compact area -->
-                    <div class="compact-clickable-area" data-match-index="${matchIndex}" data-container-id="${containerId}" onclick="handleExpandClick(event, this)">
+                    <div class="compact-clickable-area" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
                         <!-- HEADER -->
                         <div class="match-header-v2">
                             <h3>${match.name}</h3>
@@ -835,7 +835,7 @@
 
                     <!-- Collapse Button -->
                     <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 2px solid rgba(255,255,255,0.1);">
-                        <button class="collapse-btn" data-match-index="${matchIndex}" data-container-id="${containerId}" onclick="handleCollapseClick(event, this)">
+                        <button class="collapse-btn" onclick="event.stopPropagation(); collapseMatch(${matchIndex}, '${containerId}')">
                             ⬆ Collapse Match
                         </button>
                     </div>
@@ -1548,49 +1548,22 @@
         // CLICK-TO-EXPAND FUNCTIONALITY
         // ==============================================
 
-        function handleExpandClick(event, element) {
-            event.stopPropagation();
-            event.preventDefault();
-
-            const matchIndex = element.getAttribute('data-match-index');
-            const containerId = element.getAttribute('data-container-id');
-
-            console.log('Expand area clicked:', { matchIndex, containerId });
-
-            toggleMatchExpansion(matchIndex, containerId);
-        }
-
         function toggleMatchExpansion(matchIndex, containerId) {
-            console.log('toggleMatchExpansion called:', { matchIndex, containerId });
-
             const clickedCard = document.getElementById(`match-${matchIndex}`);
             const container = document.getElementById(containerId);
-
-            if (!clickedCard || !container) {
-                console.error('Card or container not found:', { matchIndex, containerId });
-                return;
-            }
-
             const allCards = container.querySelectorAll('.v2-format');
 
             // Only expand if not already expanded
             if (clickedCard.classList.contains('expanded')) {
-                console.log('Card already expanded, ignoring click');
-                return; // Don't collapse on click anymore - use collapse button
+                return;
             }
 
-            console.log('Expanding card...');
-
             // Expand this card, fade others
-            allCards.forEach((card, index) => {
+            allCards.forEach(card => {
                 if (card.id === `match-${matchIndex}`) {
                     card.classList.remove('compact', 'faded');
                     card.classList.add('expanded');
-
-                    // Scroll to expanded card smoothly
-                    setTimeout(() => {
-                        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }, 100);
+                    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
                 } else {
                     card.classList.remove('compact', 'expanded');
                     card.classList.add('faded');
@@ -1602,36 +1575,14 @@
         // COLLAPSE MATCH FUNCTION
         // ==============================================
 
-        function handleCollapseClick(event, button) {
-            event.stopPropagation();
-            event.preventDefault();
-
-            const matchIndex = button.getAttribute('data-match-index');
-            const containerId = button.getAttribute('data-container-id');
-
-            console.log('Collapse button clicked:', { matchIndex, containerId });
-
-            collapseMatch(matchIndex, containerId);
-        }
-
         function collapseMatch(matchIndex, containerId) {
-            console.log('collapseMatch called:', { matchIndex, containerId });
-
             const container = document.getElementById(containerId);
-            if (!container) {
-                console.error('Container not found:', containerId);
-                return;
-            }
-
             const allCards = container.querySelectorAll('.v2-format');
-            console.log('Found cards to collapse:', allCards.length);
 
             allCards.forEach(card => {
                 card.classList.remove('expanded', 'faded');
                 card.classList.add('compact');
             });
-
-            console.log('All cards collapsed');
         }
 
         // ==============================================
