@@ -386,6 +386,29 @@
             border-radius: 8px;
         }
 
+        /* Compact clickable area */
+        .compact-clickable-area {
+            cursor: pointer;
+        }
+
+        .v2-format.compact .compact-clickable-area {
+            display: block;
+        }
+
+        .v2-format.expanded .compact-clickable-area {
+            cursor: default;
+            pointer-events: none;
+        }
+
+        /* Expanded content */
+        .v2-expanded-content {
+            display: none;
+        }
+
+        .v2-format.expanded .v2-expanded-content {
+            display: block;
+        }
+
         /* Clickable visualization containers */
         .radar-container {
             cursor: pointer;
@@ -607,15 +630,17 @@
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
                 <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}">
-                    <!-- HEADER (clickable to expand) -->
-                    <div class="match-header-v2" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
-                        <h3>${match.name}</h3>
-                        <div class="match-meta">${match.org} • ${match.role} • ${match.city || 'Location not specified'}</div>
-                        ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
-                    </div>
+                    <!-- Clickable compact area -->
+                    <div class="compact-clickable-area" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
+                        <!-- HEADER -->
+                        <div class="match-header-v2">
+                            <h3>${match.name}</h3>
+                            <div class="match-meta">${match.org} • ${match.role} • ${match.city || 'Location not specified'}</div>
+                            ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
+                        </div>
 
-                    <!-- SCORE HERO -->
-                    <div class="score-hero">
+                        <!-- SCORE HERO -->
+                        <div class="score-hero">
                         <div class="final-score">${Math.round(scoreData.score || match.score)}</div>
                         <div class="score-meta">
                             <div class="grade-display">Grade: ${scoreData.grade || 'N/A'}</div>
@@ -624,18 +649,22 @@
                             ${scoreData.scoring?.variance?.model_ci95 ? `<div class="ci-display">±${Math.round((scoreData.scoring.variance.model_ci95[1] - scoreData.scoring.variance.model_ci95[0]) / 2)} pts @95%</div>` : ''}
                         </div>
                     </div>
+                    </div>
+                    <!-- End compact clickable area -->
 
+                    <!-- EXPANDED CONTENT (not clickable for expansion) -->
+                    <div class="v2-expanded-content">
                     <!-- LAYER 5: VISUALIZATION -->
                     <div class="layer-section layer-5">
                         <h3 class="layer-title">📊 LAYER 5: Multi-Dimensional Score Breakdown</h3>
 
                         <!-- Row 1: Radar + Agent Performance -->
                         <div class="visualization-container">
-                            <div class="radar-container" onclick="openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
                                 <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="openVisualizationPopup('agentBarChart-${matchIndex}', 'Agent Performance')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('agentBarChart-${matchIndex}', 'Agent Performance')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Agent Performance</h4>
                                 <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -643,11 +672,11 @@
 
                         <!-- Row 2: Synergy Breakdown + Opportunity Timing -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" onclick="openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Synergy Distribution')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Synergy Distribution')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Synergy Distribution</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="openVisualizationPopup('opportunityTiming-${matchIndex}', 'Opportunity Timing')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Opportunity Timing')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Opportunity Timing</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -655,7 +684,7 @@
 
                         <!-- Row 3: Value Exchange + Match Strengths -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" onclick="openVisualizationPopup('valueExchange-${matchIndex}', 'Value Exchange')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('valueExchange-${matchIndex}', 'Value Exchange')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Value Exchange</h4>
                                 <canvas id="valueExchange-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -666,11 +695,11 @@
 
                         <!-- Row 4: V4.1 Confidence Band + Contribution Waterfall -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" onclick="openVisualizationPopup('confidenceBand-${matchIndex}', 'Score Confidence Band')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('confidenceBand-${matchIndex}', 'Score Confidence Band')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Score Confidence Band</h4>
                                 <canvas id="confidenceBand-${matchIndex}" width="400" height="220"></canvas>
                             </div>
-                            <div class="radar-container" onclick="openVisualizationPopup('contribWaterfall-${matchIndex}', 'Contribution Waterfall')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('contribWaterfall-${matchIndex}', 'Contribution Waterfall')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Contribution Waterfall</h4>
                                 <canvas id="contribWaterfall-${matchIndex}" width="400" height="220"></canvas>
                             </div>
@@ -678,7 +707,7 @@
 
                         <!-- Row 5: V4.1 Cohort Percentiles -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" style="grid-column: 1 / -1;" onclick="openVisualizationPopup('percentileStrip-${matchIndex}', 'Cohort Percentiles')">
+                            <div class="radar-container" style="grid-column: 1 / -1;" onclick="event.stopPropagation(); openVisualizationPopup('percentileStrip-${matchIndex}', 'Cohort Percentiles')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Cohort Percentiles</h4>
                                 <canvas id="percentileStrip-${matchIndex}" height="160"></canvas>
                             </div>
@@ -762,10 +791,12 @@
 
                     <!-- Collapse Button -->
                     <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 2px solid rgba(255,255,255,0.1);">
-                        <button class="collapse-btn" onclick="collapseMatch(${matchIndex}, '${containerId}')">
+                        <button class="collapse-btn" onclick="event.stopPropagation(); collapseMatch(${matchIndex}, '${containerId}')">
                             ⬆ Collapse Match
                         </button>
                     </div>
+                    </div>
+                    <!-- End v2-expanded-content -->
                 </div>
                 `;
 
@@ -1519,8 +1550,6 @@
         // ==============================================
 
         function openVisualizationPopup(canvasId, title) {
-            event.stopPropagation(); // Prevent card expansion/collapse
-
             const sourceCanvas = document.getElementById(canvasId);
             if (!sourceCanvas) {
                 console.error('Canvas not found:', canvasId);
