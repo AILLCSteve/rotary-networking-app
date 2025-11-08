@@ -601,21 +601,21 @@
                     <strong>${data.member.name}</strong> | ${data.member.org} | ${data.member.role}
                 `;
 
-                // Display top 3 matches (with full V2 output)
-                displayMatches(data.top3, 'top3Matches', true);
+                // Display top 3 matches (identical rendering to brainstorm)
+                displayMatches(data.top3, 'top3Matches');
 
-                // Display brainstorm matches (with full V2 output)
-                displayMatches(data.brainstorm, 'brainstormMatches', false);
+                // Display brainstorm matches (identical rendering to top 3)
+                displayMatches(data.brainstorm, 'brainstormMatches');
 
             } catch (error) {
                 console.error('Failed to load dashboard:', error);
             }
         }
 
-        function displayMatches(matches, containerId, isTop3) {
+        function displayMatches(matches, containerId) {
             const container = document.getElementById(containerId);
 
-            console.log(`📊 Displaying ${matches?.length || 0} matches in ${containerId}`, { isTop3 });
+            console.log(`📊 Displaying ${matches?.length || 0} matches in ${containerId}`);
 
             if (!matches || matches.length === 0) {
                 container.innerHTML = '<p class="no-matches">No matches generated yet. Click the button above to generate matches.</p>';
