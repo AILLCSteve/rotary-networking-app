@@ -441,6 +441,41 @@
             box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
         }
 
+        /* Layer 5 toggle button */
+        .layer5-toggle-btn {
+            padding: 0.6rem 1.5rem;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .layer5-toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(79, 172, 254, 0.4);
+        }
+
+        /* Layer 5 collapsible content */
+        .layer5-visuals-content {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.3s ease;
+        }
+
+        .layer5-visuals-content.expanded {
+            max-height: 10000px;
+            opacity: 1;
+            overflow: visible;
+        }
+
         .quality-metrics {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -656,8 +691,15 @@
                     <div class="v2-expanded-content">
                     <!-- LAYER 5: VISUALIZATION -->
                     <div class="layer-section layer-5">
-                        <h3 class="layer-title">📊 LAYER 5: Multi-Dimensional Score Breakdown</h3>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 class="layer-title" style="margin-bottom: 0;">📊 LAYER 5: Multi-Dimensional Score Breakdown</h3>
+                            <button class="layer5-toggle-btn" onclick="event.stopPropagation(); toggleLayer5Visuals(${matchIndex})" id="layer5ToggleBtn-${matchIndex}">
+                                📊 Open Visuals
+                            </button>
+                        </div>
 
+                        <!-- Collapsible visualization content -->
+                        <div class="layer5-visuals-content collapsed" id="layer5Visuals-${matchIndex}">
                         <!-- Row 1: Radar + Agent Performance -->
                         <div class="visualization-container">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
@@ -730,6 +772,8 @@
                             `).join('')}
                         </div>
                         ` : ''}
+                        </div>
+                        <!-- End layer5-visuals-content -->
                     </div>
 
                     <!-- LAYER 2: AGENT OUTPUTS -->
@@ -1601,6 +1645,29 @@
                 vizBox.style.display = 'none';
                 vizBox.innerHTML = '';
                 progressBox.style.display = 'block';
+            }
+        }
+
+        // ==============================================
+        // LAYER 5 TOGGLE FUNCTIONALITY
+        // ==============================================
+
+        function toggleLayer5Visuals(matchIndex) {
+            const visualsContent = document.getElementById(`layer5Visuals-${matchIndex}`);
+            const toggleBtn = document.getElementById(`layer5ToggleBtn-${matchIndex}`);
+
+            if (visualsContent.classList.contains('collapsed')) {
+                // Expand
+                visualsContent.classList.remove('collapsed');
+                visualsContent.classList.add('expanded');
+                toggleBtn.innerHTML = '✕ Close Visuals';
+                toggleBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+            } else {
+                // Collapse
+                visualsContent.classList.add('collapsed');
+                visualsContent.classList.remove('expanded');
+                toggleBtn.innerHTML = '📊 Open Visuals';
+                toggleBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
             }
         }
 
