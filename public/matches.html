@@ -328,6 +328,39 @@
             line-height: 1.8;
         }
 
+        /* Mobile responsive for visualizations */
+        @media (max-width: 768px) {
+            .visualization-container {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .radar-container {
+                padding: 1rem;
+            }
+
+            .radar-container canvas {
+                max-width: 100%;
+                height: auto !important;
+                width: 100% !important;
+            }
+
+            .agent-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .visualization-container {
+                gap: 1rem;
+            }
+
+            .radar-container {
+                padding: 0.75rem;
+            }
+        }
+
         .synthesis-narrative {
             font-size: 1.05rem;
             margin-bottom: 1.5rem;

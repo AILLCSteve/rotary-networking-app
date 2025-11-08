@@ -686,7 +686,9 @@ body::after {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -1167,30 +1169,227 @@ p, li, span, div {
 }
 
 /* ========== RESPONSIVE ========== */
-@media (max-width: 768px) {
+/* ========== TABLET RESPONSIVE (max-width: 1024px) ========== */
+@media (max-width: 1024px) {
   .container {
-    padding: 1rem;
+    max-width: 100%;
+    padding: 1.5rem;
   }
 
+  .matches-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+/* ========== MOBILE RESPONSIVE (max-width: 768px) ========== */
+@media (max-width: 768px) {
+  /* Container & Layout */
+  .container {
+    padding: 1rem;
+    max-width: 100%;
+  }
+
+  /* Typography */
   .header h1 {
     font-size: 2rem;
   }
 
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  /* Cards */
+  .card {
+    padding: 1.5rem;
+    border-radius: 16px;
+  }
+
+  /* Grid Layouts */
   .matches-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .stats-bar {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
-  .card {
+  /* Match Cards */
+  .match-card {
+    padding: 1.25rem;
+  }
+
+  .match-card.expanded {
     padding: 1.5rem;
   }
 
+  /* Tables - Horizontal Scroll */
+  .table-wrapper,
+  .card > table,
+  table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+    width: 100%;
+  }
+
+  table {
+    min-width: 600px; /* Force horizontal scroll for wide tables */
+  }
+
+  th, td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.9rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    width: auto;
+  }
+
+  /* Admin Panel - Button Grid */
+  .card .btn:not(.btn-small) {
+    display: block;
+    width: 100%;
+  }
+
+  /* Forms */
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+    width: 100%;
+  }
+
+  /* Modal */
   .modal-content {
-    padding: 2rem;
-    max-width: 90%;
+    padding: 1.5rem;
+    max-width: 95%;
+    margin: 1rem;
+    border-radius: 16px;
+  }
+
+  /* Visualizations - Match Page */
+  .visualization-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .radar-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto;
+  }
+
+  .radar-container canvas {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Layer Sections */
+  .layer-section {
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .layer-title {
+    font-size: 1.3rem;
+  }
+
+  /* Score Display */
+  .score-display {
+    font-size: 2.5rem;
+  }
+
+  .score-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  /* Agent Cards */
+  .agent-card {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Dimension Breakdown */
+  .dimension-item {
+    padding: 0.75rem;
+  }
+}
+
+/* ========== SMALL MOBILE (max-width: 480px) ========== */
+@media (max-width: 480px) {
+  /* Extra small screens */
+  .container {
+    padding: 0.75rem;
+  }
+
+  .header h1 {
+    font-size: 1.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+
+  .match-card {
+    padding: 1rem;
+  }
+
+  /* Tables - Even more compact */
+  table {
+    min-width: 500px;
+    font-size: 0.8rem;
+  }
+
+  th, td {
+    padding: 0.5rem 0.35rem;
+    font-size: 0.75rem;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .btn-small {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  /* Score Display */
+  .score-display {
+    font-size: 2rem;
+  }
+
+  /* Compact spacing */
+  .stats-bar {
+    gap: 0.75rem;
+  }
+
+  .stat-item {
+    padding: 0.75rem;
+  }
+
+  .matches-grid {
+    gap: 0.75rem;
   }
 }
 
