@@ -664,9 +664,9 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
                     <!-- Clickable compact area -->
-                    <div class="compact-clickable-area" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
+                    <div class="compact-clickable-area">
                         <!-- HEADER -->
                         <div class="match-header-v2">
                             <h3>${match.name}</h3>
@@ -833,12 +833,6 @@
                         </div>
                     </div>
 
-                    <!-- Collapse Button -->
-                    <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 2px solid rgba(255,255,255,0.1);">
-                        <button class="collapse-btn" onclick="event.stopPropagation(); collapseMatch(${matchIndex}, '${containerId}')">
-                            ⬆ Collapse Match
-                        </button>
-                    </div>
                     </div>
                     <!-- End v2-expanded-content -->
                 </div>
@@ -1553,8 +1547,12 @@
             const container = document.getElementById(containerId);
             const allCards = container.querySelectorAll('.v2-format');
 
-            // Only expand if not already expanded
+            // If already expanded, collapse all
             if (clickedCard.classList.contains('expanded')) {
+                allCards.forEach(card => {
+                    card.classList.remove('expanded', 'faded');
+                    card.classList.add('compact');
+                });
                 return;
             }
 
@@ -1568,20 +1566,6 @@
                     card.classList.remove('compact', 'expanded');
                     card.classList.add('faded');
                 }
-            });
-        }
-
-        // ==============================================
-        // COLLAPSE MATCH FUNCTION
-        // ==============================================
-
-        function collapseMatch(matchIndex, containerId) {
-            const container = document.getElementById(containerId);
-            const allCards = container.querySelectorAll('.v2-format');
-
-            allCards.forEach(card => {
-                card.classList.remove('expanded', 'faded');
-                card.classList.add('compact');
             });
         }
 
