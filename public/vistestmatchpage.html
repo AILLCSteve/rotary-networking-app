@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualization Test - Networking Matches</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* V2 Output Display Styles */
+        .match-card {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .match-card.expanded {
+            grid-column: 1 / -1;
+            max-width: 100%;
+        }
+
+        .match-header-enhanced {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .expand-toggle {
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: #667eea;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+        }
+
+        .expand-toggle:hover {
+            background: rgba(102, 126, 234, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .v2-analysis {
+            display: none;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .v2-analysis.visible {
+            display: block;
+            animation: slideDown 0.4s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .analysis-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .analysis-section h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .agent-output {
+            background: rgba(102, 126, 234, 0.08);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 3px solid #667eea;
+        }
+
+        .agent-output h4 {
+            color: #667eea;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .agent-score {
+            display: inline-block;
+            background: rgba(0, 200, 100, 0.15);
+            color: #00c864;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+        }
+
+        .opportunity-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .opportunity-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            border-left: 3px solid #00c864;
+        }
+
+        .quality-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metric-box {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 0.25rem;
+        }
+
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .viz-container {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .viz-container h4 {
+            color: #667eea;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .insight-tag {
+            display: inline-block;
+            background: rgba(102, 126, 234, 0.15);
+            color: #667eea;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* V2 LEGACY FORMAT STYLES */
+        .v2-format {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid rgba(79, 172, 254, 0.3);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            cursor: pointer;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .v2-format:hover {
+            border-color: rgba(79, 172, 254, 0.6);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(79, 172, 254, 0.2);
+        }
+
+        /* Compact mode - show only preview */
+        .v2-format.compact .layer-section {
+            display: none;
+        }
+
+        /* Expanded mode - full width, show everything */
+        .v2-format.expanded {
+            grid-column: 1 / -1;
+            cursor: default;
+            transform: none;
+        }
+
+        .v2-format.expanded:hover {
+            transform: none;
+        }
+
+        /* Faded mode - other cards when one is expanded */
+        .v2-format.faded {
+            opacity: 0;
+            pointer-events: none;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .match-header-v2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 2px solid rgba(79, 172, 254, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: -2rem -2rem 2rem -2rem;
+        }
+
+        .match-header-v2 h3 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            color: #00f2fe;
+        }
+
+        .match-meta {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }
+
+        .score-hero {
+            text-align: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(79, 172, 254, 0.15), rgba(0, 242, 254, 0.15));
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            border: 2px solid rgba(79, 172, 254, 0.3);
+        }
+
+        .final-score {
+            font-size: 4.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        .score-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .grade-display,
+        .processing-time,
+        .pipeline-version {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .layer-section {
+            margin-bottom: 2.5rem;
+            padding: 2rem;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 16px;
+            border: 1px solid rgba(79, 172, 254, 0.2);
+        }
+
+        .layer-title {
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            color: #4facfe;
+            font-weight: 700;
+        }
+
+        .visualization-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .radar-container {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1.5rem;
+            border-radius: 12px;
+        }
+
+        .confidence-matrix {
+            /* Styles handled inline in renderConfidenceMatrix */
+        }
+
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .synthesis-content {
+            line-height: 1.8;
+        }
+
+        /* Mobile responsive for visualizations */
+        @media (max-width: 768px) {
+            .visualization-container {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .radar-container {
+                padding: 1rem;
+            }
+
+            .radar-container canvas {
+                max-width: 100%;
+                height: auto !important;
+                width: 100% !important;
+            }
+
+            .agent-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .visualization-container {
+                gap: 1rem;
+            }
+
+            .radar-container {
+                padding: 0.75rem;
+            }
+        }
+
+        .synthesis-narrative {
+            font-size: 1.05rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.95;
+        }
+
+        .opportunities-section h4 {
+            color: #4facfe;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        .opportunities-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .opportunities-list li {
+            padding: 1rem;
+            margin-bottom: 0.8rem;
+            background: rgba(79, 172, 254, 0.08);
+            border-left: 4px solid #4facfe;
+            border-radius: 8px;
+        }
+
+        /* Compact clickable area */
+        .compact-clickable-area {
+            cursor: pointer;
+        }
+
+        .v2-format.compact .compact-clickable-area {
+            display: block;
+        }
+
+        .v2-format.expanded .compact-clickable-area {
+            cursor: default;
+            pointer-events: none;
+        }
+
+        /* Expanded content */
+        .v2-expanded-content {
+            display: none;
+        }
+
+        .v2-format.expanded .v2-expanded-content {
+            display: block;
+        }
+
+        /* Clickable visualization containers */
+        .radar-container {
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .radar-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79, 172, 254, 0.3);
+        }
+
+        /* Collapse button */
+        .collapse-btn {
+            display: inline-block;
+            margin: 1rem auto;
+            padding: 0.75rem 2rem;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .collapse-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.4);
+        }
+
+        /* Layer 5 toggle button */
+        .layer5-toggle-btn {
+            padding: 0.6rem 1.5rem;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .layer5-toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(79, 172, 254, 0.4);
+        }
+
+        /* Layer 5 collapsible content */
+        .layer5-visuals-content {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.3s ease;
+        }
+
+        .layer5-visuals-content.expanded {
+            max-height: 10000px;
+            opacity: 1;
+            overflow: visible;
+        }
+
+        .quality-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .metric-item {
+            text-align: center;
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(79, 172, 254, 0.2);
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4facfe;
+        }
+
+        .quality-notes {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+
+        .intelligence-data {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Slow-Transitioning Background Slideshow -->
+    <div id="bg-slideshow">
+        <div class="bg-slide"></div>
+        <div class="bg-slide"></div>
+        <div class="bg-slide"></div>
+        <div class="bg-slide"></div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Visualization Test - Networking Matches</h1>
+            <div id="memberInfo" class="member-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>🌟 Your Top 3 Matches</h2>
+            <p class="info">These are your highest-scored potential connections with deep AI analysis. Click "View Full Analysis" to see all insights!</p>
+
+            <div class="action-bar">
+                <button class="btn btn-primary" id="generateTop3">Generate My Top 3 Matches</button>
+            </div>
+
+            <div id="top3Matches" class="matches-grid"></div>
+        </div>
+
+        <div class="section">
+            <h2>💡 Explore More Connections</h2>
+            <p class="info">Brainstorm opportunities with everyone who opted in (excludes your Top 3)</p>
+
+            <div class="action-bar">
+                <button class="btn btn-secondary" id="generateBrainstorm">Brainstorm with Everyone</button>
+            </div>
+
+            <div id="brainstormMatches" class="matches-grid"></div>
+        </div>
+
+        <!-- V2 Progress Overlay (reused for both Top 3, Brainstorm, and Visualizations) -->
+        <div class="progress-overlay" id="progressOverlay" onclick="closeVisualizationPopup()">
+            <div class="progress-box" id="progressBox" onclick="event.stopPropagation()">
+                <h3 id="progressTitle">⚡ NEXUS Production Processing...</h3>
+                <p id="progressDescription">Running multi-agent analysis with parallel AI processing</p>
+                <div class="progress-stages" id="progressStages">
+                    <!-- Populated dynamically by JavaScript -->
+                </div>
+                <p class="progress-estimate" id="progressEstimate">Estimated time: ~25 seconds</p>
+            </div>
+            <!-- Visualization Popup Content (reuses same overlay) -->
+            <div id="vizPopupCanvas" class="progress-box" style="display: none;" onclick="event.stopPropagation()">
+                <!-- Populated by openVisualizationPopup() -->
+            </div>
+        </div>
+
+        <!-- Intro Modal -->
+        <div id="introModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" id="closeModal">&times;</span>
+                <div id="modalContent"></div>
+                <button class="btn btn-primary" id="markAcknowledged" style="margin-top: 2rem;">✓ Mark as Introduced</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get member ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const memberId = urlParams.get('id');
+
+        if (!memberId) {
+            alert('No member ID provided. Please register first.');
+            window.location.href = '/';
+        }
+
+        let currentIntroId = null;
+
+        // Load member data and matches
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`/api/member/${memberId}`);
+                const data = await response.json();
+
+                // Display member info
+                document.getElementById('memberInfo').innerHTML = `
+                    <strong>${data.member.name}</strong> | ${data.member.org} | ${data.member.role}
+                `;
+
+                // Display top 3 matches (identical rendering to brainstorm)
+                displayMatches(data.top3, 'top3Matches');
+
+                // Display brainstorm matches (identical rendering to top 3)
+                displayMatches(data.brainstorm, 'brainstormMatches');
+
+            } catch (error) {
+                console.error('Failed to load dashboard:', error);
+            }
+        }
+
+        function displayMatches(matches, containerId) {
+            const container = document.getElementById(containerId);
+
+            console.log(`📊 Displaying ${matches?.length || 0} matches in ${containerId}`);
+
+            if (!matches || matches.length === 0) {
+                container.innerHTML = '<p class="no-matches">No matches generated yet. Click the button above to generate matches.</p>';
+                return;
+            }
+
+            container.innerHTML = matches.map((match, matchIndex) => {
+                // Parse score breakdown if available
+                let scoreData = null;
+
+                console.log(`   Match ${matchIndex}: ${match.name} - has score_breakdown: ${!!match.score_breakdown}`);
+
+                if (match.score_breakdown) {
+                    try {
+                        scoreData = typeof match.score_breakdown === 'string'
+                            ? JSON.parse(match.score_breakdown)
+                            : match.score_breakdown;
+                        console.log(`   ✅ Parsed score_breakdown for ${match.name}`, {
+                            hasScoring: !!scoreData.scoring,
+                            hasAgentOutputs: !!scoreData.agent_outputs,
+                            hasSynthesis: !!scoreData.synthesis
+                        });
+                    } catch (e) {
+                        console.error('Error parsing score breakdown:', e);
+                        scoreData = null;
+                    }
+                }
+
+                // If no V2 data, show minimal card with regenerate hint
+                if (!scoreData || !scoreData.scoring) {
+                    console.warn(`   ⚠️  Match ${matchIndex} (${match.name}) missing V2 data - showing minimal card`);
+                    return `
+                    <div class="match-card" id="match-${matchIndex}" style="padding: 2rem; background: rgba(255, 50, 50, 0.1); border: 2px solid rgba(255, 100, 100, 0.3);">
+                        <h4>${match.name}</h4>
+                        <p>${match.org} • ${match.role}</p>
+                        <p style="margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px;">
+                            ⚠️ <strong>Deep AI analysis not available for this match.</strong>
+                            <br><br>
+                            This match was generated before the NEXUS Production system was implemented.
+                            <br><br>
+                            <strong>Solution:</strong> Click the "Brainstorm with Everyone" button above to regenerate all matches with full AI analysis and visualizations.
+                        </p>
+                    </div>
+                    `;
+                }
+
+                // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
+                let cardHTML = `
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
+                    <!-- Clickable compact area -->
+                    <div class="compact-clickable-area">
+                        <!-- HEADER -->
+                        <div class="match-header-v2">
+                            <h3>${match.name}</h3>
+                            <div class="match-meta">${match.org} • ${match.role} • ${match.city || 'Location not specified'}</div>
+                            ${match.status === 'acknowledged' ? '<span class="badge">✓ Introduced</span>' : ''}
+                        </div>
+
+                        <!-- SCORE HERO -->
+                        <div class="score-hero">
+                        <div class="final-score">${Math.round(scoreData.score || match.score)}</div>
+                        <div class="score-meta">
+                            <div class="grade-display">Grade: ${scoreData.grade || 'N/A'}</div>
+                            <div class="processing-time">⚡ ${scoreData.processing_time || 'N/A'}s processing</div>
+                            <div class="pipeline-version">🤖 ${scoreData.pipeline_version || 'NEXUS Production'}</div>
+                            ${scoreData.scoring?.variance?.model_ci95 ? `<div class="ci-display">±${Math.round((scoreData.scoring.variance.model_ci95[1] - scoreData.scoring.variance.model_ci95[0]) / 2)} pts @95%</div>` : ''}
+                        </div>
+                    </div>
+                    </div>
+                    <!-- End compact clickable area -->
+
+                    <!-- EXPANDED CONTENT (not clickable for expansion) -->
+                    <div class="v2-expanded-content">
+                    <!-- LAYER 5: VISUALIZATION -->
+                    <div class="layer-section layer-5">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 class="layer-title" style="margin-bottom: 0;">📊 LAYER 5: Multi-Dimensional Score Breakdown</h3>
+                            <button class="layer5-toggle-btn" onclick="event.stopPropagation(); toggleLayer5Visuals(${matchIndex})" id="layer5ToggleBtn-${matchIndex}">
+                                📊 Open Visuals
+                            </button>
+                        </div>
+
+                        <!-- Collapsible visualization content -->
+                        <div class="layer5-visuals-content collapsed" id="layer5Visuals-${matchIndex}">
+                        <!-- Row 1: Radar + Agent Performance -->
+                        <div class="visualization-container">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
+                                <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('agentBarChart-${matchIndex}', 'Agent Performance')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Agent Performance</h4>
+                                <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Synergy Breakdown + Opportunity Timing -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Synergy Distribution')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Synergy Distribution</h4>
+                                <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Opportunity Timing')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Opportunity Timing</h4>
+                                <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Value Exchange + Match Strengths -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('valueExchange-${matchIndex}', 'Value Exchange')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Value Exchange</h4>
+                                <canvas id="valueExchange-${matchIndex}" width="400" height="400"></canvas>
+                            </div>
+                            <div class="confidence-matrix" id="matchStrengths-${matchIndex}">
+                                <!-- Filled by renderMatchStrengths -->
+                            </div>
+                        </div>
+
+                        <!-- Row 4: V4.1 Confidence Band + Contribution Waterfall -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('confidenceBand-${matchIndex}', 'Score Confidence Band')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Score Confidence Band</h4>
+                                <canvas id="confidenceBand-${matchIndex}" width="400" height="220"></canvas>
+                            </div>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('contribWaterfall-${matchIndex}', 'Contribution Waterfall')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Contribution Waterfall</h4>
+                                <canvas id="contribWaterfall-${matchIndex}" width="400" height="220"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Row 5: V4.1 Cohort Percentiles -->
+                        <div class="visualization-container" style="margin-top: 1.5rem;">
+                            <div class="radar-container" style="grid-column: 1 / -1;" onclick="event.stopPropagation(); openVisualizationPopup('percentileStrip-${matchIndex}', 'Cohort Percentiles')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Cohort Percentiles</h4>
+                                <canvas id="percentileStrip-${matchIndex}" height="160"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Key Opportunities (moved from Match Strengths) -->
+                        ${scoreData.scoring?.dimension_scores ? `
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border-left: 4px solid #10b981;">
+                            <h5 style="color: #00f2fe; margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
+                            ${[
+                                { label: 'Strategic Synergy', value: scoreData.scoring.dimension_scores.strategic_synergy || 0 },
+                                { label: 'Innovation Potential', value: scoreData.scoring.dimension_scores.innovation_potential || 0 },
+                                { label: 'Network Effects', value: scoreData.scoring.dimension_scores.network_effects || 0 },
+                                { label: 'Tactical Value', value: scoreData.scoring.dimension_scores.tactical_value || 0 }
+                            ].sort((a, b) => b.value - a.value).slice(0, 3).map((opp, i) => `
+                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
+                                    <strong style="color: #10b981;">${i + 1}.</strong> ${opp.label}
+                                    <span style="float: right; color: #4facfe; font-weight: 600;">${Math.round(opp.value)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        ` : ''}
+                        </div>
+                        <!-- End layer5-visuals-content -->
+                    </div>
+
+                    <!-- LAYER 2: AGENT OUTPUTS -->
+                    <div class="layer-section layer-2">
+                        <h3 class="layer-title">🤖 LAYER 2: Multi-Agent Analysis</h3>
+                        <div class="agent-grid" id="agentGrid-${matchIndex}">
+                            <!-- Filled by renderAgentOutputs -->
+                        </div>
+                    </div>
+
+                    <!-- LAYER 3: SYNTHESIS -->
+                    <div class="layer-section layer-3">
+                        <h3 class="layer-title">🎯 LAYER 3: Master Synthesis</h3>
+                        <div class="synthesis-content">
+                            <div class="synthesis-narrative">
+                                ${scoreData.synthesis?.strategic_narrative || 'Synthesis not available'}
+                            </div>
+                            ${scoreData.synthesis?.top_5_opportunities && scoreData.synthesis.top_5_opportunities.length > 0 ? `
+                            <div class="opportunities-section">
+                                <h4>Top 5 Strategic Opportunities:</h4>
+                                <ul class="opportunities-list">
+                                    ${scoreData.synthesis.top_5_opportunities.map(opp => `<li>${opp}</li>`).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- LAYER 4: QUALITY CONTROL -->
+                    <div class="layer-section layer-4">
+                        <h3 class="layer-title">✅ LAYER 4: Quality Control</h3>
+                        <div class="quality-metrics">
+                            <div class="metric-item">
+                                <div class="metric-label">Verification Score</div>
+                                <div class="metric-value">${scoreData.quality_control?.verification_score || 'N/A'}%</div>
+                            </div>
+                            <div class="metric-item">
+                                <div class="metric-label">Quality Score</div>
+                                <div class="metric-value">${scoreData.quality_control?.quality_score || 'N/A'}%</div>
+                            </div>
+                        </div>
+                        ${scoreData.quality_control?.verified_synthesis ? `
+                        <div class="quality-notes">
+                            <strong>Quality Notes:</strong>
+                            <p>${scoreData.quality_control.verified_synthesis}</p>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- LAYER 1: INTELLIGENCE -->
+                    <div class="layer-section layer-1">
+                        <h3 class="layer-title">🔍 LAYER 1: Intelligence Gathered</h3>
+                        <div class="intelligence-data">
+                            ${scoreData.intelligence ? `
+                            <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; color: rgba(255,255,255,0.9);">${JSON.stringify(scoreData.intelligence, null, 2)}</pre>
+                            ` : '<p style="opacity: 0.7;">No intelligence data available for this match.</p>'}
+                        </div>
+                    </div>
+
+                    </div>
+                    <!-- End v2-expanded-content -->
+                </div>
+                `;
+
+                return cardHTML;
+            }).join('');
+
+            // Render all charts and matrices after DOM is updated
+            setTimeout(() => {
+                console.log(`Starting visualization rendering for ${matches.length} matches...`);
+                matches.forEach((match, matchIndex) => {
+                    let scoreData = null;
+                    if (match.score_breakdown) {
+                        try {
+                            scoreData = typeof match.score_breakdown === 'string'
+                                ? JSON.parse(match.score_breakdown)
+                                : match.score_breakdown;
+                        } catch (e) {
+                            console.error(`Failed to parse score_breakdown for match ${matchIndex}:`, e);
+                            return;
+                        }
+                    }
+                    if (scoreData && scoreData.scoring) {
+                        console.log(`Match ${matchIndex} data structure:`, {
+                            hasDimensionScores: !!scoreData.scoring.dimension_scores,
+                            hasConfidence: !!scoreData.scoring.confidence,
+                            hasAgentOutputs: !!scoreData.agent_outputs,
+                            agentKeys: scoreData.agent_outputs ? Object.keys(scoreData.agent_outputs) : []
+                        });
+                        renderRadarChart(matchIndex, scoreData.scoring.dimension_scores);
+                        renderAgentBarChart(matchIndex, scoreData.agent_outputs);
+                        renderSynergyDoughnut(matchIndex, scoreData.scoring.dimension_scores);
+                        renderOpportunityTiming(matchIndex, scoreData.agent_outputs, scoreData.scoring);
+                        renderValueExchange(matchIndex, scoreData.agent_outputs);
+                        renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring);
+                        // V4.1 Visualizations
+                        renderConfidenceBand(matchIndex, scoreData.scoring);
+                        renderContributionWaterfall(matchIndex, scoreData.scoring);
+                        renderPercentileStrip(matchIndex, scoreData.scoring);
+                        renderAgentOutputs(matchIndex, scoreData.agent_outputs);
+                    } else {
+                        console.warn(`Match ${matchIndex} missing scoreData or scoring:`, {
+                            hasScoreData: !!scoreData,
+                            hasScoring: scoreData?.scoring
+                        });
+                    }
+                });
+            }, 100);
+        }
+
+        // ==============================================
+        // V2 RENDERING FUNCTIONS (Radar, Confidence Matrix, Agent Outputs)
+        // ==============================================
+
+        function renderRadarChart(matchIndex, dimensionScores) {
+            const ctx = document.getElementById(`radarChart-${matchIndex}`);
+            if (!ctx) {
+                console.error(`Canvas element radarChart-${matchIndex} not found`);
+                return;
+            }
+
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js library not loaded');
+                return;
+            }
+
+            console.log(`Rendering radar chart for match ${matchIndex} with data:`, dimensionScores);
+
+            try {
+                new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: [
+                        'Strategic Synergy',
+                        'Tactical Value',
+                        'Innovation Potential',
+                        'Risk/Compatibility',
+                        'Network Effects',
+                        'Temporal Urgency'
+                    ],
+                    datasets: [{
+                        label: 'Match Quality',
+                        data: [
+                            dimensionScores?.strategic_synergy || 0,
+                            dimensionScores?.tactical_value || 0,
+                            dimensionScores?.innovation_potential || 0,
+                            dimensionScores?.risk_compatibility || 0,
+                            dimensionScores?.network_effects || 0,
+                            dimensionScores?.temporal_urgency || 0
+                        ],
+                        backgroundColor: 'rgba(79, 172, 254, 0.2)',
+                        borderColor: '#4facfe',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#00f2fe',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#00f2fe'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)',
+                                backdropColor: 'transparent'
+                            },
+                            grid: {
+                                color: 'rgba(255,255,255,0.2)'
+                            },
+                            angleLines: {
+                                color: 'rgba(255,255,255,0.2)'
+                            },
+                            pointLabels: {
+                                color: 'rgba(255,255,255,0.9)',
+                                font: {
+                                    size: 11,
+                                    weight: '600'
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: 'white',
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error(`Error rendering radar chart for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderAgentBarChart(matchIndex, agentOutputs) {
+            const ctx = document.getElementById(`agentBarChart-${matchIndex}`);
+            if (!ctx) {
+                console.error(`Canvas element agentBarChart-${matchIndex} not found`);
+                return;
+            }
+
+            console.log(`Rendering agent bar chart for match ${matchIndex}`);
+
+            try {
+                const scores = {
+                'Business Synergy': agentOutputs?.business_synergy?.synergy_score || 0,
+                'Creative Collab': agentOutputs?.creative_collaboration?.creativity_score || 0,
+                'Risk Assessment': agentOutputs?.risk_compatibility?.compatibility_score || 0,
+                'Strategic Growth': agentOutputs?.strategic_growth?.strategic_score || 0,
+                'Tactical Planning': agentOutputs?.tactical_connection?.tactical_score || 0
+            };
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(scores),
+                    datasets: [{
+                        label: 'Agent Scores',
+                        data: Object.values(scores),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(0, 242, 254, 0.8)',
+                            'rgba(16, 185, 129, 0.8)'
+                        ],
+                        borderColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#4facfe',
+                            '#00f2fe',
+                            '#10b981'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: {
+                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 11 } },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error(`Error rendering agent bar chart for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderSynergyDoughnut(matchIndex, dimensionScores) {
+            const ctx = document.getElementById(`synergyDoughnut-${matchIndex}`);
+            if (!ctx) {
+                console.error(`Canvas element synergyDoughnut-${matchIndex} not found`);
+                return;
+            }
+
+            console.log(`Rendering synergy doughnut for match ${matchIndex}`);
+
+            try {
+                const scores = {
+                'Strategic Synergy': dimensionScores?.strategic_synergy || 0,
+                'Tactical Value': dimensionScores?.tactical_value || 0,
+                'Innovation': dimensionScores?.innovation_potential || 0,
+                'Risk/Compat': dimensionScores?.risk_compatibility || 0,
+                'Network Effects': dimensionScores?.network_effects || 0,
+                'Temporal': dimensionScores?.temporal_urgency || 0
+            };
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(scores),
+                    datasets: [{
+                        data: Object.values(scores),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(0, 242, 254, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(251, 146, 60, 0.8)'
+                        ],
+                        borderColor: '#1a1a2e',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: 'rgba(255,255,255,0.9)',
+                                font: { size: 11 },
+                                padding: 10
+                            }
+                        }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error(`Error rendering synergy doughnut for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderOpportunityTiming(matchIndex, agentOutputs, scoring) {
+            const ctx = document.getElementById(`opportunityTiming-${matchIndex}`);
+            if (!ctx) {
+                console.error(`Canvas element opportunityTiming-${matchIndex} not found`);
+                return;
+            }
+
+            console.log(`Rendering opportunity timing for match ${matchIndex}`);
+
+            try {
+                // Extract timing and urgency insights
+            const strategic = agentOutputs?.strategic_growth?.strategic_score || 0;
+            const tactical = agentOutputs?.tactical_connection?.tactical_score || 0;
+            const temporal = scoring?.dimension_scores?.temporal_urgency || 60;
+
+            const labels = ['Immediate Wins', 'Short-Term Growth', 'Long-Term Strategic'];
+            const data = [tactical, (tactical + strategic) / 2, strategic];
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Opportunity Value',
+                        data: data,
+                        fill: true,
+                        backgroundColor: 'rgba(79, 172, 254, 0.3)',
+                        borderColor: '#4facfe',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#00f2fe',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        x: {
+                            ticks: { color: 'rgba(255,255,255,0.9)' },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error(`Error rendering opportunity timing for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderValueExchange(matchIndex, agentOutputs) {
+            const ctx = document.getElementById(`valueExchange-${matchIndex}`);
+            if (!ctx) {
+                console.error(`Canvas element valueExchange-${matchIndex} not found`);
+                return;
+            }
+
+            console.log(`Rendering value exchange for match ${matchIndex}`);
+
+            try {
+                // Show what each person brings vs needs (complementary exchange)
+            const businessValue = agentOutputs?.business_synergy?.synergy_score || 0;
+            const creativeValue = agentOutputs?.creative_collaboration?.creativity_score || 0;
+            const networkValue = agentOutputs?.strategic_growth?.strategic_score || 0;
+
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Business Assets', 'Creative Collaboration', 'Network Access', 'Strategic Alignment', 'Resource Sharing'],
+                    datasets: [{
+                        label: 'Mutual Value',
+                        data: [businessValue, creativeValue, networkValue, businessValue * 0.9, creativeValue * 0.85],
+                        backgroundColor: 'rgba(16, 185, 129, 0.3)',
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#10b981'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)',
+                                backdropColor: 'transparent'
+                            },
+                            grid: { color: 'rgba(255,255,255,0.2)' },
+                            angleLines: { color: 'rgba(255,255,255,0.2)' },
+                            pointLabels: {
+                                color: 'rgba(255,255,255,0.9)',
+                                font: { size: 10, weight: '600' }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            } catch (error) {
+                console.error(`Error rendering value exchange for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderMatchStrengths(matchIndex, synthesis, scoring) {
+            const container = document.getElementById(`matchStrengths-${matchIndex}`);
+            if (!container) {
+                console.error(`Container element matchStrengths-${matchIndex} not found`);
+                return;
+            }
+
+            console.log(`Rendering match strengths for match ${matchIndex}`);
+
+            try {
+                // Extract key strengths from synthesis
+            const opportunities = synthesis?.top_5_opportunities || [];
+            const dimensionScores = scoring?.dimension_scores || {};
+
+            // Calculate top strengths
+            const strengths = [
+                { label: 'Strategic Synergy', value: dimensionScores.strategic_synergy || 0 },
+                { label: 'Innovation Potential', value: dimensionScores.innovation_potential || 0 },
+                { label: 'Network Effects', value: dimensionScores.network_effects || 0 },
+                { label: 'Tactical Value', value: dimensionScores.tactical_value || 0 }
+            ].sort((a, b) => b.value - a.value);
+
+            const topOpportunities = opportunities.slice(0, 3);
+
+            container.innerHTML = `
+                <div style="padding: 1.5rem;">
+                    <h4 style="color: #4facfe; margin-bottom: 1rem; text-align: center;">Top Match Strengths</h4>
+                    ${strengths.map((s, i) => `
+                        <div style="margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="font-size: 0.9rem; font-weight: 600;">${i + 1}. ${s.label}</span>
+                                <span style="color: #10b981; font-weight: 700;">${Math.round(s.value)}</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #4facfe, #00f2fe); height: 100%; width: ${s.value}%; transition: width 0.3s;"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+
+                    ${topOpportunities.length > 0 ? `
+                        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <h5 style="color: #00f2fe; margin-bottom: 0.75rem; font-size: 0.95rem;">Key Opportunities</h5>
+                            ${topOpportunities.map((opp, i) => `
+                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.9rem;">
+                                    <strong>${i + 1}.</strong> ${opp.label}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            } catch (error) {
+                console.error(`Error rendering match strengths for match ${matchIndex}:`, error);
+                container.innerHTML = '<div style="padding: 1rem; color: red;">Error rendering match strengths</div>';
+            }
+        }
+
+        function renderConfidenceMatrix(matchIndex, confidence) {
+            const matrix = document.getElementById(`confidenceMatrix-${matchIndex}`);
+            if (!matrix) {
+                console.warn(`Confidence matrix element not found for match ${matchIndex}`);
+                return;
+            }
+
+            console.log(`Rendering confidence matrix for match ${matchIndex}:`, confidence);
+
+            matrix.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;">
+                    <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.data_quality || 0}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Data Quality</div>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.agent_consensus || 0}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Agent Consensus</div>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.synthesis_quality || 0}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Synthesis Quality</div>
+                    </div>
+                    <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
+                        <div style="font-size: 1.5rem; font-weight: 700; color: #00f2fe;">${confidence?.overall || 0}%</div>
+                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Overall Confidence</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==============================================
+        // V4.1 VISUALIZATION FUNCTIONS
+        // ==============================================
+
+        function as100(x) {
+            return (typeof x === 'number' && isFinite(x)) ? Math.max(0, Math.min(100, x)) : 0;
+        }
+
+        function getDims(scoring) {
+            const d = scoring?.dimension_scores || {};
+            return [
+                as100(d.strategic_synergy),
+                as100(d.tactical_value),
+                as100(d.innovation_potential),
+                as100(d.risk_compatibility),
+                as100(d.network_effects),
+                as100(d.temporal_urgency)
+            ];
+        }
+
+        function renderConfidenceBand(matchIndex, scoring) {
+            const el = document.getElementById(`confidenceBand-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const base = as100(scoring?.base_score);
+            const final = as100(scoring?.final_score || scoring?.score);
+            const ci = scoring?.variance?.model_ci95;
+            const low = as100(ci?.[0]);
+            const high = as100(ci?.[1]);
+
+            // Skip if nothing to show
+            if (!final && !base && !ci) return;
+
+            const labels = ['Base Model', 'Final Score'];
+            const values = [base || final, final];
+
+            try {
+                new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            ci ? {
+                                label: 'CI Low',
+                                data: [low, low],
+                                fill: '+1',
+                                borderWidth: 0,
+                                backgroundColor: 'rgba(79,172,254,0.15)'
+                            } : null,
+                            ci ? {
+                                label: 'CI High',
+                                data: [high, high],
+                                borderWidth: 0
+                            } : null,
+                            {
+                                label: 'Score',
+                                data: values,
+                                borderColor: '#4facfe',
+                                backgroundColor: 'rgba(79,172,254,0.3)',
+                                borderWidth: 3,
+                                tension: 0.3
+                            }
+                        ].filter(Boolean)
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering confidence band for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderContributionWaterfall(matchIndex, scoring) {
+            const el = document.getElementById(`contribWaterfall-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const d = scoring?.dimension_scores || {};
+            const w = { S: 0.25, T: 0.20, I: 0.20, R: 0.15, N: 0.15, U: 0.05 };
+            const vals = {
+                S: w.S * as100(d.strategic_synergy),
+                T: w.T * as100(d.tactical_value),
+                I: w.I * as100(d.innovation_potential),
+                R: w.R * as100(d.risk_compatibility),
+                N: w.N * as100(d.network_effects),
+                U: w.U * as100(d.temporal_urgency)
+            };
+
+            try {
+                new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
+                        datasets: [{
+                            data: Object.values(vals),
+                            backgroundColor: [
+                                'rgba(79,172,254,0.8)',
+                                'rgba(0,242,254,0.8)',
+                                'rgba(102,126,234,0.8)',
+                                'rgba(118,75,162,0.8)',
+                                'rgba(237,66,100,0.8)',
+                                'rgba(255,159,64,0.8)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering contribution waterfall for match ${matchIndex}:`, error);
+            }
+        }
+
+        function renderPercentileStrip(matchIndex, scoring) {
+            const el = document.getElementById(`percentileStrip-${matchIndex}`);
+            if (!el || !window.Chart) return;
+
+            const dims = scoring?.dimension_scores ? getDims(scoring) : null;
+            if (!dims) return;
+
+            try {
+                new Chart(el, {
+                    type: 'bar',
+                    data: {
+                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
+                        datasets: [{
+                            data: dims,
+                            backgroundColor: 'rgba(79,172,254,0.8)'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                min: 0,
+                                max: 100,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: 'rgba(255,255,255,0.7)' }
+                            },
+                            y: { ticks: { color: 'rgba(255,255,255,0.9)' } }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error(`Error rendering percentile strip for match ${matchIndex}:`, error);
+            }
+        }
+
+        // ==============================================
+
+        function renderAgentOutputs(matchIndex, agentOutputs) {
+            const grid = document.getElementById(`agentGrid-${matchIndex}`);
+            if (!grid) {
+                console.warn(`Agent grid element not found for match ${matchIndex}`);
+                return;
+            }
+            if (!agentOutputs) {
+                console.warn(`No agent outputs data for match ${matchIndex}`);
+                return;
+            }
+
+            console.log(`Rendering agent outputs for match ${matchIndex}:`, agentOutputs);
+
+            const agentData = [
+                { name: 'Business Synergy Analyst', key: 'business_synergy', scoreKey: 'synergy_score', icon: '💼' },
+                { name: 'Creative Collaboration Architect', key: 'creative_collaboration', scoreKey: 'creativity_score', icon: '✨' },
+                { name: 'Risk & Compatibility Assessor', key: 'risk_compatibility', scoreKey: 'compatibility_score', icon: '⚖️' },
+                { name: 'Strategic Growth Advisor', key: 'strategic_growth', scoreKey: 'strategic_score', icon: '📈' },
+                { name: 'Tactical Connection Planner', key: 'tactical_connection', scoreKey: 'tactical_score', icon: '🎯' }
+            ];
+
+            const renderedCards = agentData.map(agent => {
+                const data = agentOutputs[agent.key];
+                if (!data) {
+                    console.warn(`No data for agent ${agent.key} in match ${matchIndex}`);
+                    return '';
+                }
+
+                // Extract meaningful fields (skip score/confidence/conversation_starters)
+                const insights = [];
+                for (const [key, val] of Object.entries(data)) {
+                    if (key.includes('score') || key === 'confidence' || key === 'conversation_starters') continue;
+
+                    let displayVal = '';
+                    if (Array.isArray(val)) {
+                        displayVal = val.slice(0, 3).join('; ');
+                    } else if (typeof val === 'string') {
+                        displayVal = val.substring(0, 200);
+                    } else {
+                        continue;
+                    }
+
+                    insights.push({ label: key.replace(/_/g, ' '), value: displayVal });
+                    if (insights.length >= 3) break;
+                }
+
+                return `
+                    <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h4 style="margin: 0; font-size: 1rem;">${agent.icon} ${agent.name}</h4>
+                            <div style="font-size: 1.2rem; font-weight: 700; color: #4facfe;">${data[agent.scoreKey] || 'N/A'}<span style="font-size: 0.8rem; opacity: 0.7;">/100</span></div>
+                        </div>
+                        ${data.confidence ? `<div style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 0.8rem;">Confidence: ${data.confidence}%</div>` : ''}
+                        <div style="font-size: 0.9rem; line-height: 1.6;">
+                            ${insights.map(insight => `
+                                <div style="margin-bottom: 0.8rem;">
+                                    <strong style="color: #4facfe;">${insight.label}:</strong>
+                                    <div style="opacity: 0.9; margin-top: 0.2rem;">${insight.value}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).filter(html => html);
+
+            console.log(`Rendered ${renderedCards.length} agent cards for match ${matchIndex}`);
+            grid.innerHTML = renderedCards.join('');
+        }
+
+        // ==============================================
+        // CLICK-TO-EXPAND FUNCTIONALITY
+        // ==============================================
+
+        function toggleMatchExpansion(matchIndex, containerId) {
+            const clickedCard = document.getElementById(`match-${matchIndex}`);
+            const container = document.getElementById(containerId);
+            const allCards = container.querySelectorAll('.v2-format');
+
+            // If already expanded, collapse all
+            if (clickedCard.classList.contains('expanded')) {
+                allCards.forEach(card => {
+                    card.classList.remove('expanded', 'faded');
+                    card.classList.add('compact');
+                });
+                return;
+            }
+
+            // Expand this card, fade others
+            allCards.forEach(card => {
+                if (card.id === `match-${matchIndex}`) {
+                    card.classList.remove('compact', 'faded');
+                    card.classList.add('expanded');
+                    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+                } else {
+                    card.classList.remove('compact', 'expanded');
+                    card.classList.add('faded');
+                }
+            });
+        }
+
+        // ==============================================
+        // VISUALIZATION POPUP FUNCTIONS
+        // ==============================================
+
+        function openVisualizationPopup(canvasId, title) {
+            const sourceCanvas = document.getElementById(canvasId);
+            if (!sourceCanvas) {
+                console.error('Canvas not found:', canvasId);
+                return;
+            }
+
+            // Use the progress overlay div (same style)
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Hide progress box, show viz box
+            progressBox.style.display = 'none';
+            vizBox.style.display = 'block';
+
+            // Clear and set up the popup
+            vizBox.innerHTML = `
+                <h2 style="text-align: center; color: #4facfe; margin-bottom: 2rem; font-size: 2rem;">${title}</h2>
+                <div style="max-width: 1200px; max-height: 75vh; display: flex; justify-content: center; align-items: center;">
+                    <canvas id="popupCanvas" style="max-width: 100%; height: auto;"></canvas>
+                </div>
+                <p style="text-align: center; margin-top: 2rem; opacity: 0.7; font-size: 0.9rem;">Click anywhere to close</p>
+            `;
+
+            // Show the overlay (reuse progress overlay)
+            overlay.classList.remove('hidden');
+
+            // Clone the chart to the popup canvas
+            setTimeout(() => {
+                const popupCanvas = document.getElementById('popupCanvas');
+                if (popupCanvas && sourceCanvas) {
+                    // Copy canvas dimensions and content
+                    popupCanvas.width = sourceCanvas.width;
+                    popupCanvas.height = sourceCanvas.height;
+                    const ctx = popupCanvas.getContext('2d');
+                    ctx.drawImage(sourceCanvas, 0, 0);
+                }
+            }, 100);
+        }
+
+        function closeVisualizationPopup() {
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Only close if showing visualization (not progress)
+            if (vizBox.style.display === 'block') {
+                overlay.classList.add('hidden');
+                vizBox.style.display = 'none';
+                vizBox.innerHTML = '';
+                progressBox.style.display = 'block';
+            }
+        }
+
+        // ==============================================
+        // LAYER 5 TOGGLE FUNCTIONALITY
+        // ==============================================
+
+        function toggleLayer5Visuals(matchIndex) {
+            const visualsContent = document.getElementById(`layer5Visuals-${matchIndex}`);
+            const toggleBtn = document.getElementById(`layer5ToggleBtn-${matchIndex}`);
+
+            if (visualsContent.classList.contains('collapsed')) {
+                // Expand
+                visualsContent.classList.remove('collapsed');
+                visualsContent.classList.add('expanded');
+                toggleBtn.innerHTML = '✕ Close Visuals';
+                toggleBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+            } else {
+                // Collapse
+                visualsContent.classList.add('collapsed');
+                visualsContent.classList.remove('expanded');
+                toggleBtn.innerHTML = '📊 Open Visuals';
+                toggleBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+            }
+        }
+
+        // V2-STYLE PROGRESS OVERLAY FUNCTIONS
+        let progressInterval = null;
+        let currentStageIndex = 0;
+
+        function showProgressOverlay(title, description, estimate, stages) {
+            const overlay = document.getElementById('progressOverlay');
+            const titleEl = document.getElementById('progressTitle');
+            const descEl = document.getElementById('progressDescription');
+            const estimateEl = document.getElementById('progressEstimate');
+            const stagesEl = document.getElementById('progressStages');
+
+            titleEl.textContent = title;
+            descEl.textContent = description;
+            estimateEl.textContent = `Estimated time: ${estimate}`;
+            // Build stage items
+            stagesEl.innerHTML = stages.map((stage, index) => `
+                <div class="stage-item ${index === 0 ? 'active' : ''}" id="stage-${index}">
+                    ${index === 0 ? '<div class="spinner"></div>' : '<div></div>'}
+                    <span>${stage}</span>
+                </div>
+            `).join('');
+
+            overlay.classList.add('active');
+            currentStageIndex = 0;
+
+            // Animate stages
+            const stageDuration = stages.length > 0 ? (parseFloat(estimate) * 1000) / stages.length : 2000;
+            progressInterval = setInterval(() => {
+                if (currentStageIndex < stages.length - 1) {
+                    // Mark current stage as completed
+                    const currentStage = document.getElementById(`stage-${currentStageIndex}`);
+                    if (currentStage) {
+                        currentStage.classList.remove('active');
+                        currentStage.classList.add('completed');
+                        currentStage.querySelector('div').innerHTML = '';  // Remove spinner
+                    }
+
+                    // Activate next stage
+                    currentStageIndex++;
+                    const nextStage = document.getElementById(`stage-${currentStageIndex}`);
+                    if (nextStage) {
+                        nextStage.classList.add('active');
+                        nextStage.querySelector('div').innerHTML = '<div class="spinner"></div>';
+
+                        // Auto-scroll to active stage
+                        const progressBox = document.querySelector('.progress-box');
+                        if (progressBox) {
+                            nextStage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
+                }
+            }, stageDuration);
+        }
+
+        function hideProgressOverlay() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+
+            // Mark all stages as completed
+            document.querySelectorAll('.stage-item').forEach(stage => {
+                stage.classList.remove('active');
+                stage.classList.add('completed');
+                stage.querySelector('div').innerHTML = '';
+            });
+
+            // Hide overlay after a brief delay
+            setTimeout(() => {
+                document.getElementById('progressOverlay').classList.remove('active');
+                currentStageIndex = 0;
+            }, 800);
+        }
+
+        // Generate Top 3 with V2-style progress overlay
+        document.getElementById('generateTop3').addEventListener('click', async () => {
+            const btn = document.getElementById('generateTop3');
+
+            showProgressOverlay(
+                '⚡ Generating Your Top 3 Matches',
+                'Running NEXUS Production with 5 parallel AI agents per match',
+                '25',
+                [
+                    'Analyzing your profile and needs',
+                    'Scoring all potential matches',
+                    'Selecting top 3 candidates',
+                    'Match 1/3: Multi-agent analysis',
+                    'Match 2/3: Multi-agent analysis',
+                    'Match 3/3: Multi-agent analysis',
+                    'Synthesizing strategic opportunities',
+                    'Quality control & fact-checking',
+                    'Generating conversation starters'
+                ]
+            );
+
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/generate-top3/${memberId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    hideProgressOverlay();
+                    setTimeout(() => loadDashboard(), 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to generate matches');
+                }
+            } catch (error) {
+                hideProgressOverlay();
+                console.error('Full error:', error);
+                let errorMsg = '❌ Failed to generate matches: ' + error.message;
+                if (error.message.includes('JSON')) {
+                    errorMsg += '\n\nThis might be a server error. Check the Render logs for details.';
+                }
+                alert(errorMsg);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Generate Brainstorm with V2-style progress overlay
+        document.getElementById('generateBrainstorm').addEventListener('click', async () => {
+            const btn = document.getElementById('generateBrainstorm');
+
+            showProgressOverlay(
+                '💡 Generating Brainstorm Matches',
+                'Processing all members with NEXUS Production multi-agent analysis',
+                '45',
+                [
+                    'Analyzing your profile',
+                    'Scoring all attendees',
+                    'Excluding your Top 3 matches',
+                    'Running NEXUS Production (batch 1/3)',
+                    'Multi-agent analysis (batch 1/3)',
+                    'Running NEXUS Production (batch 2/3)',
+                    'Multi-agent analysis (batch 2/3)',
+                    'Running NEXUS Production (batch 3/3)',
+                    'Multi-agent analysis (batch 3/3)',
+                    'Quality control & fact-checking',
+                    'Synthesizing strategic opportunities',
+                    'Generating conversation starters'
+                ]
+            );
+
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/generate-brainstorm/${memberId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    hideProgressOverlay();
+                    setTimeout(() => loadDashboard(), 1000);
+                } else {
+                    throw new Error(result.error || 'Failed to generate brainstorm matches');
+                }
+            } catch (error) {
+                hideProgressOverlay();
+                console.error('Full error:', error);
+                let errorMsg = '❌ Failed to generate brainstorm: ' + error.message;
+                if (error.message.includes('JSON')) {
+                    errorMsg += '\n\nThis might be a server error. Check the Render logs for details.';
+                }
+                alert(errorMsg);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // Modal controls
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('introModal').classList.add('hidden');
+        });
+
+        document.getElementById('markAcknowledged').addEventListener('click', async () => {
+            if (currentIntroId) {
+                await fetch(`/api/acknowledge-intro/${currentIntroId}`, { method: 'POST' });
+                document.getElementById('introModal').classList.add('hidden');
+                loadDashboard();
+            }
+        });
+
+        // Initial load
+        loadDashboard();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>
