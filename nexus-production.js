@@ -379,36 +379,49 @@ async function performQualityControl(member1, member2, intelligence, agentOutput
     };
   }
 
-  const prompt = `You are the Quality Control layer of a multi-agent AI system. Your job is to verify and fact-check the synthesis output from previous AI agents.
+  const prompt = `You are the Quality Control layer of a multi-agent AI system. Your critical role is to verify synthesis outputs and provide SPECIFIC, EVIDENCE-BASED reasoning.
 
 SYNTHESIS TO VERIFY:
 ${JSON.stringify(synthesis, null, 2)}
 
-RAW DATA USED BY AGENTS:
-Intelligence: ${JSON.stringify(intelligence, null, 2)}
-Agent Outputs: ${JSON.stringify(agentOutputs, null, 2)}
+RAW DATA FROM INTELLIGENCE GATHERING:
+${JSON.stringify(intelligence, null, 2)}
+
+AGENT ANALYSIS OUTPUTS:
+${JSON.stringify(agentOutputs, null, 2)}
 
 MEMBER PROFILES:
-- ${member1.name} (${member1.org}, ${member1.industry})
-- ${member2.name} (${member2.org}, ${member2.industry})
+- ${member1.name} at ${member1.org} (${member1.industry}): "${member1.rev_driver || 'N/A'}" | Needs: "${member1.needs || 'N/A'}" | Assets: "${member1.assets || 'N/A'}"
+- ${member2.name} at ${member2.org} (${member2.industry}): "${member2.rev_driver || 'N/A'}" | Needs: "${member2.needs || 'N/A'}" | Assets: "${member2.assets || 'N/A'}"
 
-YOUR TASK:
-1. Review the synthesis and verify each claim against the raw data
-2. Identify which insights are well-supported vs. speculative
-3. Tag confidence levels and remove unsupported claims
-4. Provide a quality assessment
+YOUR CRITICAL TASK - Be SPECIFIC and EVIDENCE-BASED:
+
+1. VERIFY each claim against the raw data - cite SPECIFIC evidence
+2. Explain WHY you reached each conclusion with reasoning
+3. Explain WHY confidence levels are what they are
+4. Provide SPECIFIC CONFIRMATIONS like "${member1.name}'s company does X which directly addresses ${member2.name}'s need for Y"
 
 Return JSON with these fields:
 {
-  "verified_synthesis": "A cleaned version of the strategic narrative that only includes claims supported by the raw data. Summarize what was verified: which agent outputs support the key recommendations, what specific data points confirm the opportunities identified, and any caveats about confidence levels.",
-  "verified_opportunities": ["List only the opportunities that are directly supported by evidence in the agent outputs"],
-  "confidence_tagged_narrative": "The synthesis rewritten with [HIGH CONFIDENCE], [MEDIUM CONFIDENCE], or [LOW CONFIDENCE] tags before each major claim based on supporting evidence",
-  "removed_claims": ["List any claims that were removed or flagged because they lack supporting evidence, with brief explanation why"],
+  "verified_synthesis": "Write 2-3 paragraphs that explain: (1) WHAT was confirmed and WHY - cite specific profile data like '${member1.name} stated they need X, and ${member2.name} offers Y which directly addresses this', (2) SPECIFIC areas of confirmation - reference actual quotes/data from profiles, (3) Any gaps or areas requiring further exploration. Be SPECIFIC - name names, cite profile details, explain reasoning.",
+
+  "why_we_concluded_this": "Explain the logical chain: 'We concluded X because ${member1.name}'s profile mentions A, ${member2.name}'s profile shows B, and the business synergy agent identified C specific opportunities. This led us to score...'",
+
+  "confidence_reasoning": "Explain WHY confidence is HIGH/MEDIUM/LOW: 'HIGH confidence on revenue potential because both profiles explicitly mention compatible revenue models. MEDIUM confidence on innovation because while ${member1.name} mentions interest in X, ${member2.name}'s capabilities in this area are not explicitly stated. LOW confidence on network effects because...'",
+
+  "specific_confirmations": [
+    "${member1.name}'s stated need for 'X' directly matches ${member2.name}'s asset of 'Y'",
+    "Both operate in ${member1.industry || 'their industry'} suggesting shared market understanding",
+    "List 3-5 SPECIFIC confirmations citing actual profile data"
+  ],
+
+  "areas_of_uncertainty": ["List specific claims that lack direct evidence and explain why"],
+
   "verification_score": 85,
   "quality_score": 88
 }
 
-Be specific in verified_synthesis - mention which agent findings support the recommendations.`;
+CRITICAL: Reference ACTUAL data from profiles. Do NOT make generic statements. Every claim must tie back to specific profile content.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
