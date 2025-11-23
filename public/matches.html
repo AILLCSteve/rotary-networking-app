@@ -758,7 +758,7 @@
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">Ranked Strengths</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Connection Value')">
+                            <div class="radar-container" onclick="event.stopPropagation(); openHtmlVisualizationPopup('opportunityTiming-${matchIndex}', 'Connection Value Breakdown')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">💰 Connection Value</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
@@ -1275,56 +1275,74 @@
                 };
 
                 // Calculate scores with diminishing returns and clear reasoning
+                // Each category maps to a specific agent section for click navigation
                 const valueCategories = [
                     {
                         label: 'Revenue',
                         score: calcValueScore(directExchanges.length, assetMatches.length),
                         why: directExchanges.length > 0
                             ? `${directExchanges.length} direct value exchange${directExchanges.length > 1 ? 's' : ''} identified`
-                            : (assetMatches.length > 0 ? 'Indirect revenue via asset matches' : 'Referral potential only')
+                            : (assetMatches.length > 0 ? 'Indirect revenue via asset matches' : 'Referral potential only'),
+                        agentKey: 'business_synergy',
+                        agentName: 'Business Synergy'
                     },
                     {
                         label: 'Cost Savings',
                         score: calcValueScore(resourceOpps.length, assetMatches.length),
                         why: resourceOpps.length > 0
                             ? `${resourceOpps.length} resource sharing opportunit${resourceOpps.length > 1 ? 'ies' : 'y'}`
-                            : 'Limited cost synergies found'
+                            : 'Limited cost synergies found',
+                        agentKey: 'business_synergy',
+                        agentName: 'Business Synergy'
                     },
                     {
                         label: 'Network',
                         score: calcValueScore(networkMult.length, coCreation.length),
                         why: networkMult.length > 0
                             ? `${networkMult.length} network multiplication path${networkMult.length > 1 ? 's' : ''}`
-                            : 'Standard network expansion potential'
+                            : 'Standard network expansion potential',
+                        agentKey: 'creative_collaboration',
+                        agentName: 'Creative Collaboration'
                     },
                     {
                         label: 'Innovation',
                         score: calcValueScore(coCreation.length, growthPaths.length),
                         why: coCreation.length > 0
                             ? `${coCreation.length} co-creation idea${coCreation.length > 1 ? 's' : ''} possible`
-                            : 'Limited innovation alignment'
+                            : 'Limited innovation alignment',
+                        agentKey: 'creative_collaboration',
+                        agentName: 'Creative Collaboration'
                     },
                     {
                         label: 'Market Access',
                         score: calcValueScore(growthPaths.length, networkMult.length),
                         why: growthPaths.length > 0
                             ? `${growthPaths.length} market expansion path${growthPaths.length > 1 ? 's' : ''}`
-                            : 'Limited market overlap found'
+                            : 'Limited market overlap found',
+                        agentKey: 'strategic_growth',
+                        agentName: 'Strategic Growth'
                     }
                 ];
 
                 // Sort by score descending
                 valueCategories.sort((a, b) => b.score - a.score);
 
-                // Render as styled HTML bars with explanations
+                // Render as styled HTML bars with explanations - CLICKABLE to scroll to Layer 2 data
                 const isMobile = window.innerWidth < 600;
                 container.outerHTML = `
-                    <div class="connection-value-breakdown" id="opportunityTiming-${matchIndex}" style="padding: 1rem;">
-                        <h4 style="color: rgba(255,255,255,0.95); text-shadow: 0 0 10px rgba(255,255,255,0.3); margin-bottom: 1rem; font-size: ${isMobile ? '0.9rem' : '1rem'}; text-align: center;">💰 Connection Value Breakdown</h4>
+                    <div class="connection-value-breakdown" id="opportunityTiming-${matchIndex}" style="padding: 1rem;" data-match-index="${matchIndex}">
+                        <h4 style="color: rgba(255,255,255,0.95); text-shadow: 0 0 10px rgba(255,255,255,0.3); margin-bottom: 0.5rem; font-size: ${isMobile ? '0.9rem' : '1rem'}; text-align: center;">💰 Connection Value Breakdown</h4>
+                        <p style="color: rgba(255,255,255,0.5); font-size: 0.7rem; text-align: center; margin-bottom: 1rem;">Tap any metric to see source data in Layer 2</p>
                         ${valueCategories.map((cat, i) => {
                             const barColor = i === 0 ? '#10b981' : i === 1 ? '#3b82f6' : i === 2 ? '#8b5cf6' : i === 3 ? '#f59e0b' : '#ec4899';
                             return `
-                            <div style="margin-bottom: ${isMobile ? '0.6rem' : '0.8rem'};">
+                            <div class="value-metric-clickable"
+                                 data-match-index="${matchIndex}"
+                                 data-agent-key="${cat.agentKey}"
+                                 data-agent-name="${cat.agentName}"
+                                 style="margin-bottom: ${isMobile ? '0.6rem' : '0.8rem'}; cursor: pointer; padding: 0.5rem; border-radius: 8px; transition: background 0.2s ease;"
+                                 onmouseover="this.style.background='rgba(255,255,255,0.08)'"
+                                 onmouseout="this.style.background='transparent'">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
                                     <span style="color: rgba(255,255,255,0.9); font-size: ${isMobile ? '0.75rem' : '0.85rem'}; font-weight: 600;">${cat.label}</span>
                                     <span style="color: rgba(255,255,255,0.95); font-size: ${isMobile ? '0.8rem' : '0.9rem'}; font-weight: 700; text-shadow: 0 0 8px rgba(255,255,255,0.3);">${cat.score}</span>
@@ -1332,7 +1350,7 @@
                                 <div style="background: rgba(255,255,255,0.1); border-radius: 4px; height: 8px; overflow: hidden;">
                                     <div style="width: ${cat.score}%; height: 100%; background: ${barColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
                                 </div>
-                                <div style="color: rgba(255,255,255,0.6); font-size: ${isMobile ? '0.65rem' : '0.75rem'}; margin-top: 0.2rem; font-style: italic;">${cat.why}</div>
+                                <div style="color: rgba(255,255,255,0.6); font-size: ${isMobile ? '0.65rem' : '0.75rem'}; margin-top: 0.2rem; font-style: italic;">${cat.why} <span style="color: ${barColor};">→ View in ${cat.agentName}</span></div>
                             </div>`;
                         }).join('')}
                     </div>
@@ -1617,7 +1635,7 @@
                 const scoreGlow = score >= 75 ? 'rgba(180, 255, 200, 0.5)' : score >= 50 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 200, 150, 0.5)';
 
                 return `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);">
+                    <div id="agent-${matchIndex}-${agent.key}" class="agent-card" style="background: rgba(255,255,255,0.05); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); scroll-margin-top: 120px; transition: box-shadow 0.3s ease, border-color 0.3s ease;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                             <h4 style="margin: 0; font-size: 0.95rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5);">${agent.icon} ${agent.name}</h4>
                             <div style="font-size: 1.1rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 12px ${scoreGlow}, 0 2px 4px rgba(0, 0, 0, 0.5);">${score || 'N/A'}<span style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.6);">/100</span></div>
@@ -1759,6 +1777,21 @@
                 expandCard(matchIndex, containerId);
                 return;
             }
+
+            // === CONNECTION VALUE METRIC CLICKED (scroll to Layer 2 agent) ===
+            const valueMetric = e.target.closest('.value-metric-clickable');
+            if (valueMetric) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const matchIndex = valueMetric.dataset.matchIndex;
+                const agentKey = valueMetric.dataset.agentKey;
+                const agentName = valueMetric.dataset.agentName;
+
+                console.log('📊 Value metric clicked:', { matchIndex, agentKey, agentName });
+                scrollToAgentSection(matchIndex, agentKey, agentName);
+                return;
+            }
         }, true); // capture phase
 
         // EXPAND a specific card
@@ -1791,6 +1824,33 @@
                 card.classList.remove('expanded', 'faded');
                 card.classList.add('compact');
             });
+        }
+
+        // SCROLL TO AGENT SECTION in Layer 2
+        function scrollToAgentSection(matchIndex, agentKey, agentName) {
+            // Close any open visualization popup first
+            closeVisualizationPopup();
+
+            const agentCard = document.getElementById(`agent-${matchIndex}-${agentKey}`);
+            if (!agentCard) {
+                console.warn(`Agent section not found: agent-${matchIndex}-${agentKey}`);
+                return;
+            }
+
+            // Scroll the agent card into view
+            agentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Highlight effect - pulse glow
+            agentCard.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)';
+            agentCard.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+
+            // Remove highlight after animation
+            setTimeout(() => {
+                agentCard.style.boxShadow = '';
+                agentCard.style.borderColor = 'rgba(255,255,255,0.15)';
+            }, 2000);
+
+            console.log(`📍 Scrolled to ${agentName} section for match ${matchIndex}`);
         }
 
         // ==============================================
@@ -1850,6 +1910,49 @@
                 vizBox.innerHTML = '';
                 progressBox.style.display = 'block';
             }
+        }
+
+        // Open HTML-based visualization popup (for Connection Value which is not a canvas)
+        function openHtmlVisualizationPopup(elementId, title) {
+            const sourceElement = document.getElementById(elementId);
+            if (!sourceElement) {
+                console.error('Element not found:', elementId);
+                return;
+            }
+
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Hide progress box, show viz box
+            progressBox.style.display = 'none';
+            vizBox.style.display = 'block';
+
+            // Clone the HTML content into a mobile-friendly popup
+            const isMobile = window.innerWidth < 600;
+            vizBox.innerHTML = `
+                <h2 style="text-align: center; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: ${isMobile ? '1rem' : '2rem'}; font-size: ${isMobile ? '1.4rem' : '2rem'};">${title}</h2>
+                <div style="max-width: 600px; margin: 0 auto; padding: ${isMobile ? '0.5rem' : '1rem'}; overflow-y: auto; max-height: 70vh;">
+                    ${sourceElement.innerHTML}
+                </div>
+                <p style="text-align: center; margin-top: ${isMobile ? '1rem' : '2rem'}; color: rgba(255, 255, 255, 0.6); font-size: 0.9rem;">Tap anywhere to close</p>
+            `;
+
+            // Make clickable metrics work in popup too
+            const popupMetrics = vizBox.querySelectorAll('.value-metric-clickable');
+            popupMetrics.forEach(metric => {
+                metric.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const matchIndex = metric.dataset.matchIndex;
+                    const agentKey = metric.dataset.agentKey;
+                    const agentName = metric.dataset.agentName;
+                    scrollToAgentSection(matchIndex, agentKey, agentName);
+                });
+            });
+
+            // Show the overlay
+            overlay.classList.add('active');
         }
 
         // ==============================================
