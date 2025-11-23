@@ -1162,36 +1162,41 @@
             console.log(`Rendering strengths vs gaps for match ${matchIndex}`);
 
             try {
-                // Calculate VARIED scores by combining AI dimension scores with agent output counts
-                // This ensures different matches show different patterns
-                const baseStrategic = dimensionScores?.strategic_synergy || 50;
-                const baseTactical = dimensionScores?.tactical_value || 50;
-                const baseInnovation = dimensionScores?.innovation_potential || 50;
-                const baseCompatibility = dimensionScores?.risk_compatibility || 50;
-                const baseNetwork = dimensionScores?.network_effects || 50;
-
-                // Add variation from actual agent outputs
+                // Get raw counts from agent outputs for relative comparison
                 const directExchanges = agentOutputs?.business_synergy?.direct_value_exchanges?.length || 0;
                 const assetMatches = agentOutputs?.business_synergy?.asset_need_matches?.length || 0;
+                const resourceOpps = agentOutputs?.business_synergy?.resource_sharing_opportunities?.length || 0;
                 const coCreation = agentOutputs?.creative_collaboration?.co_creation_ideas?.length || 0;
                 const networkMult = agentOutputs?.creative_collaboration?.network_multiplication?.length || 0;
                 const growthPaths = agentOutputs?.strategic_growth?.market_expansion_opportunities?.length || 0;
+                const unexpectedSynergies = agentOutputs?.creative_collaboration?.unexpected_synergies?.length || 0;
 
-                // Apply multipliers based on ACTUAL findings for more variation
-                const strategic = Math.min(100, Math.max(20, baseStrategic + (growthPaths * 8) - (directExchanges < 1 ? 15 : 0)));
-                const tactical = Math.min(100, Math.max(20, baseTactical + (directExchanges * 10) + (assetMatches * 5) - (coCreation < 1 ? 10 : 0)));
-                const innovation = Math.min(100, Math.max(20, baseInnovation + (coCreation * 12) - (assetMatches > 2 ? 0 : 20)));
-                const compatibility = Math.min(100, Math.max(20, baseCompatibility + (assetMatches * 8) - (growthPaths < 1 ? 15 : 0)));
-                const network = Math.min(100, Math.max(20, baseNetwork + (networkMult * 15) - (directExchanges > 2 ? 0 : 10)));
+                // Calculate raw scores with diminishing returns (log scale)
+                // This creates natural variation: 0 items = low, 1-2 = medium, 3+ = high
+                const calcScore = (primary, secondary = 0, tertiary = 0) => {
+                    const raw = (Math.log2(primary + 1) * 25) + (Math.log2(secondary + 1) * 12) + (Math.log2(tertiary + 1) * 8);
+                    return Math.min(95, Math.max(25, Math.round(raw + 20)));
+                };
 
-                // Create varied scores array
-                const allScores = [
-                    { name: 'Strategy', score: Math.round(strategic) },
-                    { name: 'Tactics', score: Math.round(tactical) },
-                    { name: 'Innovation', score: Math.round(innovation) },
-                    { name: 'Compatibility', score: Math.round(compatibility) },
-                    { name: 'Network', score: Math.round(network) }
-                ].sort((a, b) => b.score - a.score);
+                // Each dimension draws from DIFFERENT data sources for natural variation
+                const rawScores = [
+                    { name: 'Strategy', score: calcScore(growthPaths, resourceOpps, unexpectedSynergies) },
+                    { name: 'Tactics', score: calcScore(directExchanges, assetMatches, 0) },
+                    { name: 'Innovation', score: calcScore(coCreation, unexpectedSynergies, growthPaths) },
+                    { name: 'Compatibility', score: calcScore(assetMatches, resourceOpps, directExchanges) },
+                    { name: 'Network', score: calcScore(networkMult, coCreation, assetMatches) }
+                ];
+
+                // Normalize to ensure spread: find min/max and stretch to 30-90 range
+                const scores = rawScores.map(s => s.score);
+                const minScore = Math.min(...scores);
+                const maxScore = Math.max(...scores);
+                const range = maxScore - minScore || 1;
+
+                const allScores = rawScores.map(s => ({
+                    name: s.name,
+                    score: Math.round(30 + ((s.score - minScore) / range) * 60) // Map to 30-90 range
+                })).sort((a, b) => b.score - a.score);
 
                 const strengths = allScores.slice(0, 3);
                 const gaps = allScores.slice(3);
@@ -1276,39 +1281,49 @@
                 const coCreation = agentOutputs?.creative_collaboration?.co_creation_ideas || [];
                 const growthPaths = agentOutputs?.strategic_growth?.market_expansion_opportunities || [];
 
-                // Calculate scores with clear reasoning
+                // Diminishing returns scoring: 0=low, 1=medium-low, 2=medium, 3+=medium-high, 5+=high
+                const calcValueScore = (count, secondaryCount = 0) => {
+                    if (count === 0 && secondaryCount === 0) return Math.round(20 + Math.random() * 15); // 20-35 (low)
+                    if (count === 0) return Math.round(30 + Math.random() * 10 + secondaryCount * 5); // 30-45 with secondary
+                    if (count === 1) return Math.round(40 + Math.random() * 10 + secondaryCount * 3); // 40-55
+                    if (count === 2) return Math.round(55 + Math.random() * 10 + Math.min(secondaryCount * 3, 10)); // 55-75
+                    if (count <= 4) return Math.round(65 + Math.random() * 10 + Math.min(secondaryCount * 2, 8)); // 65-83
+                    return Math.round(75 + Math.random() * 10 + Math.min(secondaryCount, 5)); // 75-90 (high)
+                };
+
+                // Calculate scores with diminishing returns and clear reasoning
                 const valueCategories = [
                     {
                         label: 'Revenue',
-                        score: Math.min(100, directExchanges.length * 30 + assetMatches.length * 20 + 15),
+                        score: calcValueScore(directExchanges.length, assetMatches.length),
                         why: directExchanges.length > 0
                             ? `${directExchanges.length} direct value exchange${directExchanges.length > 1 ? 's' : ''} identified`
-                            : 'Potential for referral revenue'
+                            : (assetMatches.length > 0 ? 'Indirect revenue via asset matches' : 'Referral potential only')
                     },
                     {
                         label: 'Cost Savings',
-                        score: Math.min(100, resourceOpps.length * 35 + assetMatches.length * 15 + 10),
+                        score: calcValueScore(resourceOpps.length, assetMatches.length),
                         why: resourceOpps.length > 0
                             ? `${resourceOpps.length} resource sharing opportunit${resourceOpps.length > 1 ? 'ies' : 'y'}`
                             : 'Limited cost synergies found'
                     },
                     {
                         label: 'Network',
-                        score: Math.min(100, networkMult.length * 40 + 20),
+                        score: calcValueScore(networkMult.length, coCreation.length),
                         why: networkMult.length > 0
                             ? `${networkMult.length} network multiplication path${networkMult.length > 1 ? 's' : ''}`
                             : 'Standard network expansion potential'
                     },
                     {
                         label: 'Innovation',
-                        score: Math.min(100, coCreation.length * 35 + 15),
+                        score: calcValueScore(coCreation.length, growthPaths.length),
                         why: coCreation.length > 0
                             ? `${coCreation.length} co-creation idea${coCreation.length > 1 ? 's' : ''} possible`
-                            : 'Moderate innovation alignment'
+                            : 'Limited innovation alignment'
                     },
                     {
                         label: 'Market Access',
-                        score: Math.min(100, growthPaths.length * 40 + 10),
+                        score: calcValueScore(growthPaths.length, networkMult.length),
                         why: growthPaths.length > 0
                             ? `${growthPaths.length} market expansion path${growthPaths.length > 1 ? 's' : ''}`
                             : 'Limited market overlap found'
