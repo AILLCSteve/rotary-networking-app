@@ -868,7 +868,7 @@
                         renderSynergyDoughnut(matchIndex, scoreData.scoring.dimension_scores);
                         renderOpportunityTiming(matchIndex, scoreData.agent_outputs, scoreData.scoring);
                         renderValueExchange(matchIndex, scoreData.agent_outputs);
-                        renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring);
+                        renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring, scoreData.agent_outputs);
                         // V4.1 Visualizations
                         renderConfidenceBand(matchIndex, scoreData.scoring);
                         renderContributionWaterfall(matchIndex, scoreData.scoring);
@@ -1103,31 +1103,37 @@
             console.log(`Rendering opportunity timing for match ${matchIndex}`);
 
             try {
-                // Extract timing and urgency insights
-            const strategic = agentOutputs?.strategic_growth?.strategic_score || 0;
-            const tactical = agentOutputs?.tactical_connection?.tactical_score || 0;
-            const temporal = scoring?.dimension_scores?.temporal_urgency || 60;
+                // Use ACTUAL data from agents - count of real actions/opportunities
+                const immediateActions = agentOutputs?.tactical_connection?.immediate_actions || [];
+                const conversationStarters = agentOutputs?.tactical_connection?.conversation_starters || [];
+                const growthOpportunities = agentOutputs?.strategic_growth?.market_expansion_opportunities || [];
+                const coCreationIdeas = agentOutputs?.creative_collaboration?.co_creation_ideas || [];
 
-            const labels = ['Immediate Wins', 'Short-Term Growth', 'Long-Term Strategic'];
-            const data = [tactical, (tactical + strategic) / 2, strategic];
+                // Calculate REAL values based on what the agents actually found
+                // Immediate: how many actionable items right now
+                const immediateValue = Math.min(100, (immediateActions.length * 25) + (conversationStarters.length * 15));
+                // Short-term: creative collaboration opportunities
+                const shortTermValue = Math.min(100, (coCreationIdeas.length * 20) + (agentOutputs?.creative_collaboration?.creativity_score || 0) * 0.5);
+                // Long-term: strategic growth potential
+                const longTermValue = Math.min(100, (growthOpportunities.length * 25) + (agentOutputs?.strategic_growth?.strategic_score || 0) * 0.5);
+
+            const labels = ['Immediate Actions', 'Near-Term Collaboration', 'Long-Term Growth'];
+            const data = [immediateValue, shortTermValue, longTermValue];
 
             new Chart(ctx, {
-                type: 'line',
+                type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Opportunity Value',
+                        label: 'Opportunity Strength',
                         data: data,
-                        fill: true,
-                        backgroundColor: 'rgba(79, 172, 254, 0.3)',
-                        borderColor: '#4facfe',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#00f2fe',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 6,
-                        pointHoverRadius: 8,
-                        tension: 0.4
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',  // Green for immediate
+                            'rgba(79, 172, 254, 0.8)',  // Blue for short-term
+                            'rgba(118, 75, 162, 0.8)'   // Purple for long-term
+                        ],
+                        borderColor: ['#10b981', '#4facfe', '#764ba2'],
+                        borderWidth: 2
                     }]
                 },
                 options: {
@@ -1139,7 +1145,7 @@
                             grid: { color: 'rgba(255,255,255,0.1)' }
                         },
                         x: {
-                            ticks: { color: 'rgba(255,255,255,0.9)' },
+                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 10 } },
                             grid: { display: false }
                         }
                     },
@@ -1163,18 +1169,27 @@
             console.log(`Rendering value exchange for match ${matchIndex}`);
 
             try {
-                // Show what each person brings vs needs (complementary exchange)
-            const businessValue = agentOutputs?.business_synergy?.synergy_score || 0;
-            const creativeValue = agentOutputs?.creative_collaboration?.creativity_score || 0;
-            const networkValue = agentOutputs?.strategic_growth?.strategic_score || 0;
+                // Extract REAL data from agent outputs - count actual items found
+                const directExchanges = agentOutputs?.business_synergy?.direct_value_exchanges || [];
+                const assetNeedMatches = agentOutputs?.business_synergy?.asset_need_matches || [];
+                const resourceOpps = agentOutputs?.business_synergy?.resource_sharing_opportunities || [];
+                const networkMultipliers = agentOutputs?.creative_collaboration?.network_multiplication || [];
+                const unexpectedSynergies = agentOutputs?.creative_collaboration?.unexpected_synergies || [];
+
+                // Calculate values based on ACTUAL findings, not fabricated multipliers
+                const directExchangeValue = Math.min(100, directExchanges.length * 25 + 20);
+                const assetMatchValue = Math.min(100, assetNeedMatches.length * 30 + 10);
+                const resourceValue = Math.min(100, resourceOpps.length * 25 + 15);
+                const networkValue = Math.min(100, networkMultipliers.length * 25 + 20);
+                const synergyValue = Math.min(100, unexpectedSynergies.length * 30 + 10);
 
             new Chart(ctx, {
                 type: 'radar',
                 data: {
-                    labels: ['Business Assets', 'Creative Collaboration', 'Network Access', 'Strategic Alignment', 'Resource Sharing'],
+                    labels: ['Direct Value Exchanges', 'Asset-Need Matches', 'Resource Sharing', 'Network Multipliers', 'Unexpected Synergies'],
                     datasets: [{
-                        label: 'Mutual Value',
-                        data: [businessValue, creativeValue, networkValue, businessValue * 0.9, creativeValue * 0.85],
+                        label: 'Value Found',
+                        data: [directExchangeValue, assetMatchValue, resourceValue, networkValue, synergyValue],
                         backgroundColor: 'rgba(16, 185, 129, 0.3)',
                         borderColor: '#10b981',
                         borderWidth: 2,
@@ -1197,7 +1212,7 @@
                             angleLines: { color: 'rgba(255,255,255,0.2)' },
                             pointLabels: {
                                 color: 'rgba(255,255,255,0.9)',
-                                font: { size: 10, weight: '600' }
+                                font: { size: 9, weight: '600' }
                             }
                         }
                     },
@@ -1211,7 +1226,7 @@
             }
         }
 
-        function renderMatchStrengths(matchIndex, synthesis, scoring) {
+        function renderMatchStrengths(matchIndex, synthesis, scoring, agentOutputs) {
             const container = document.getElementById(`matchStrengths-${matchIndex}`);
             if (!container) {
                 console.error(`Container element matchStrengths-${matchIndex} not found`);
@@ -1221,50 +1236,74 @@
             console.log(`Rendering match strengths for match ${matchIndex}`);
 
             try {
-                // Extract key strengths from synthesis
-            const opportunities = synthesis?.top_5_opportunities || [];
-            const dimensionScores = scoring?.dimension_scores || {};
+                // Extract REAL contextual data from synthesis and agents
+                const opportunities = synthesis?.top_5_opportunities || [];
+                const consensusPoints = synthesis?.consensus_points || [];
+                const conversationStarters = agentOutputs?.tactical_connection?.conversation_starters || [];
+                const immediateActions = agentOutputs?.tactical_connection?.immediate_actions || [];
 
-            // Calculate top strengths
-            const strengths = [
-                { label: 'Strategic Synergy', value: dimensionScores.strategic_synergy || 0 },
-                { label: 'Innovation Potential', value: dimensionScores.innovation_potential || 0 },
-                { label: 'Network Effects', value: dimensionScores.network_effects || 0 },
-                { label: 'Tactical Value', value: dimensionScores.tactical_value || 0 }
-            ].sort((a, b) => b.value - a.value);
+                // Get top opportunities (handle both string array and object array formats)
+                const topOpportunities = opportunities.slice(0, 3).map(opp =>
+                    typeof opp === 'string' ? opp : (opp.label || opp.description || JSON.stringify(opp))
+                );
 
-            const topOpportunities = opportunities.slice(0, 3);
+                // Get conversation starters
+                const topStarters = conversationStarters.slice(0, 2).map(starter =>
+                    typeof starter === 'string' ? starter : (starter.topic || starter.suggestion || JSON.stringify(starter))
+                );
+
+                // Get immediate actions
+                const topActions = immediateActions.slice(0, 2).map(action =>
+                    typeof action === 'string' ? action : (action.action || action.description || JSON.stringify(action))
+                );
 
             container.innerHTML = `
                 <div style="padding: 1.5rem;">
-                    <h4 style="color: #4facfe; margin-bottom: 1rem; text-align: center;">Top Match Strengths</h4>
-                    ${strengths.map((s, i) => `
-                        <div style="margin-bottom: 0.75rem;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                                <span style="font-size: 0.9rem; font-weight: 600;">${i + 1}. ${s.label}</span>
-                                <span style="color: #10b981; font-weight: 700;">${Math.round(s.value)}</span>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.1); height: 6px; border-radius: 3px; overflow: hidden;">
-                                <div style="background: linear-gradient(90deg, #4facfe, #00f2fe); height: 100%; width: ${s.value}%; transition: width 0.3s;"></div>
-                            </div>
-                        </div>
-                    `).join('')}
+                    <h4 style="color: #4facfe; margin-bottom: 1rem; text-align: center;">Actionable Insights</h4>
 
-                    ${topOpportunities.length > 0 ? `
-                        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                            <h5 style="color: #00f2fe; margin-bottom: 0.75rem; font-size: 0.95rem;">Key Opportunities</h5>
-                            ${topOpportunities.map((opp, i) => `
-                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.9rem;">
-                                    <strong>${i + 1}.</strong> ${opp.label}
+                    ${topStarters.length > 0 ? `
+                        <div style="margin-bottom: 1.25rem;">
+                            <h5 style="color: #10b981; margin-bottom: 0.5rem; font-size: 0.9rem;">💬 Conversation Starters</h5>
+                            ${topStarters.map(starter => `
+                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(16, 185, 129, 0.15); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
+                                    "${starter.length > 120 ? starter.substring(0, 120) + '...' : starter}"
                                 </div>
                             `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${topActions.length > 0 ? `
+                        <div style="margin-bottom: 1.25rem;">
+                            <h5 style="color: #4facfe; margin-bottom: 0.5rem; font-size: 0.9rem;">⚡ Quick Actions</h5>
+                            ${topActions.map(action => `
+                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(79, 172, 254, 0.15); border-left: 3px solid #4facfe; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
+                                    ${action.length > 120 ? action.substring(0, 120) + '...' : action}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${topOpportunities.length > 0 ? `
+                        <div>
+                            <h5 style="color: #00f2fe; margin-bottom: 0.5rem; font-size: 0.9rem;">🎯 Top Opportunities</h5>
+                            ${topOpportunities.map((opp, i) => `
+                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(0, 242, 254, 0.1); border-left: 3px solid #00f2fe; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
+                                    <strong>#${i + 1}:</strong> ${opp.length > 100 ? opp.substring(0, 100) + '...' : opp}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${topStarters.length === 0 && topActions.length === 0 && topOpportunities.length === 0 ? `
+                        <div style="text-align: center; opacity: 0.7; padding: 1rem;">
+                            <p>Explore the agent analysis below for detailed insights.</p>
                         </div>
                     ` : ''}
                 </div>
             `;
             } catch (error) {
                 console.error(`Error rendering match strengths for match ${matchIndex}:`, error);
-                container.innerHTML = '<div style="padding: 1rem; color: red;">Error rendering match strengths</div>';
+                container.innerHTML = '<div style="padding: 1rem; color: rgba(255,100,100,0.8);">Unable to load insights</div>';
             }
         }
 
@@ -1480,61 +1519,94 @@
                 return;
             }
 
-            console.log(`Rendering agent outputs for match ${matchIndex}:`, agentOutputs);
+            console.log(`Rendering agent outputs for match ${matchIndex}`);
+
+            // Helper to safely extract display text from any value (never show JSON)
+            function safeDisplayValue(val, maxLen = 150) {
+                if (val === null || val === undefined) return '';
+                if (typeof val === 'string') return val.substring(0, maxLen);
+                if (Array.isArray(val)) {
+                    // Join array items with bullets, truncate each
+                    return val.slice(0, 3).map(item => {
+                        if (typeof item === 'string') return item.substring(0, 80);
+                        if (typeof item === 'object' && item !== null) {
+                            // Extract first string value from object
+                            for (const v of Object.values(item)) {
+                                if (typeof v === 'string') return v.substring(0, 80);
+                            }
+                        }
+                        return '';
+                    }).filter(x => x).join(' • ');
+                }
+                return '';
+            }
 
             const agentData = [
-                { name: 'Business Synergy Analyst', key: 'business_synergy', scoreKey: 'synergy_score', icon: '💼' },
-                { name: 'Creative Collaboration Architect', key: 'creative_collaboration', scoreKey: 'creativity_score', icon: '✨' },
-                { name: 'Risk & Compatibility Assessor', key: 'risk_compatibility', scoreKey: 'compatibility_score', icon: '⚖️' },
-                { name: 'Strategic Growth Advisor', key: 'strategic_growth', scoreKey: 'strategic_score', icon: '📈' },
-                { name: 'Tactical Connection Planner', key: 'tactical_connection', scoreKey: 'tactical_score', icon: '🎯' }
+                { name: 'Business Synergy', key: 'business_synergy', scoreKey: 'synergy_score', icon: '💼',
+                  priorityFields: ['direct_value_exchanges', 'asset_need_matches', 'quantifiable_benefits'] },
+                { name: 'Creative Collaboration', key: 'creative_collaboration', scoreKey: 'creativity_score', icon: '✨',
+                  priorityFields: ['co_creation_ideas', 'unexpected_synergies', 'innovation_potential'] },
+                { name: 'Risk & Compatibility', key: 'risk_compatibility', scoreKey: 'compatibility_score', icon: '⚖️',
+                  priorityFields: ['cultural_fit', 'competitive_conflicts', 'red_flags'] },
+                { name: 'Strategic Growth', key: 'strategic_growth', scoreKey: 'strategic_score', icon: '📈',
+                  priorityFields: ['market_expansion_opportunities', 'strategic_positioning', 'growth_multipliers'] },
+                { name: 'Tactical Connection', key: 'tactical_connection', scoreKey: 'tactical_score', icon: '🎯',
+                  priorityFields: ['conversation_starters', 'immediate_actions', 'meeting_format'] }
             ];
 
             const renderedCards = agentData.map(agent => {
                 const data = agentOutputs[agent.key];
-                if (!data) {
-                    console.warn(`No data for agent ${agent.key} in match ${matchIndex}`);
-                    return '';
-                }
+                if (!data) return '';
 
-                // Extract meaningful fields (skip score/confidence/conversation_starters)
+                // Extract meaningful fields in priority order
                 const insights = [];
-                for (const [key, val] of Object.entries(data)) {
-                    if (key.includes('score') || key === 'confidence' || key === 'conversation_starters') continue;
-
-                    let displayVal = '';
-                    if (Array.isArray(val)) {
-                        displayVal = val.slice(0, 3).join('; ');
-                    } else if (typeof val === 'string') {
-                        displayVal = val.substring(0, 200);
-                    } else {
-                        continue;
+                for (const field of agent.priorityFields) {
+                    if (data[field]) {
+                        const displayVal = safeDisplayValue(data[field]);
+                        if (displayVal && displayVal.length > 5) {
+                            const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                            insights.push({ label, value: displayVal });
+                        }
                     }
-
-                    insights.push({ label: key.replace(/_/g, ' '), value: displayVal });
-                    if (insights.length >= 3) break;
+                    if (insights.length >= 2) break;
                 }
+
+                // If no priority fields found, try any string/array fields
+                if (insights.length === 0) {
+                    for (const [key, val] of Object.entries(data)) {
+                        if (key.includes('score') || key === 'confidence') continue;
+                        const displayVal = safeDisplayValue(val);
+                        if (displayVal && displayVal.length > 5) {
+                            const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                            insights.push({ label, value: displayVal });
+                        }
+                        if (insights.length >= 2) break;
+                    }
+                }
+
+                const score = data[agent.scoreKey];
+                const scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#4facfe' : '#f59e0b';
 
                 return `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h4 style="margin: 0; font-size: 1rem;">${agent.icon} ${agent.name}</h4>
-                            <div style="font-size: 1.2rem; font-weight: 700; color: #4facfe;">${data[agent.scoreKey] || 'N/A'}<span style="font-size: 0.8rem; opacity: 0.7;">/100</span></div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <h4 style="margin: 0; font-size: 0.95rem;">${agent.icon} ${agent.name}</h4>
+                            <div style="font-size: 1.1rem; font-weight: 700; color: ${scoreColor};">${score || 'N/A'}<span style="font-size: 0.75rem; opacity: 0.7;">/100</span></div>
                         </div>
-                        ${data.confidence ? `<div style="font-size: 0.85rem; opacity: 0.7; margin-bottom: 0.8rem;">Confidence: ${data.confidence}%</div>` : ''}
-                        <div style="font-size: 0.9rem; line-height: 1.6;">
+                        ${data.confidence ? `<div style="font-size: 0.8rem; opacity: 0.6; margin-bottom: 0.5rem;">Confidence: ${Math.round(data.confidence)}%</div>` : ''}
+                        <div style="font-size: 0.85rem; line-height: 1.5;">
                             ${insights.map(insight => `
-                                <div style="margin-bottom: 0.8rem;">
-                                    <strong style="color: #4facfe;">${insight.label}:</strong>
-                                    <div style="opacity: 0.9; margin-top: 0.2rem;">${insight.value}</div>
+                                <div style="margin-bottom: 0.6rem;">
+                                    <strong style="color: #4facfe; font-size: 0.8rem;">${insight.label}:</strong>
+                                    <div style="opacity: 0.9; margin-top: 0.15rem;">${insight.value}</div>
                                 </div>
                             `).join('')}
+                            ${insights.length === 0 ? '<div style="opacity: 0.6; font-style: italic;">Analysis complete - see score above</div>' : ''}
                         </div>
                     </div>
                 `;
             }).filter(html => html);
 
-            console.log(`Rendered ${renderedCards.length} agent cards for match ${matchIndex}`);
             grid.innerHTML = renderedCards.join('');
         }
 

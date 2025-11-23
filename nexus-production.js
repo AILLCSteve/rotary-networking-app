@@ -417,13 +417,28 @@ JSON output:
 function calculateEnhancedScore(agentOutputs, synthesis, qualityControl) {
   console.log(`\n📊 Calculating enhanced score...`);
 
+  // Calculate temporal_urgency dynamically based on actual agent data
+  // Higher urgency = more immediate actions identified, higher tactical scores
+  const immediateActions = agentOutputs.tactical_connection?.immediate_actions || [];
+  const tacticalScore = agentOutputs.tactical_connection?.tactical_score || 50;
+  const hasQuickWins = immediateActions.length >= 2;
+  const hasConversationStarters = (agentOutputs.tactical_connection?.conversation_starters || []).length > 0;
+
+  // Temporal urgency: based on how actionable this match is RIGHT NOW
+  let temporalUrgency = 40; // baseline
+  if (hasQuickWins) temporalUrgency += 25; // immediate actions boost urgency
+  if (hasConversationStarters) temporalUrgency += 15; // ready to talk
+  if (tacticalScore > 70) temporalUrgency += 10; // high tactical value
+  if (tacticalScore > 85) temporalUrgency += 10; // exceptional tactical value
+  temporalUrgency = Math.min(temporalUrgency, 100);
+
   const scores = {
     strategic_synergy: agentOutputs.business_synergy?.synergy_score || 50,
     tactical_value: agentOutputs.tactical_connection?.tactical_score || 50,
     innovation_potential: agentOutputs.creative_collaboration?.creativity_score || 50,
     risk_compatibility: 100 - (agentOutputs.risk_compatibility?.risk_score || 50),
     network_effects: agentOutputs.strategic_growth?.strategic_score || 50,
-    temporal_urgency: 60
+    temporal_urgency: temporalUrgency
   };
 
   const baseScore =
