@@ -736,26 +736,26 @@
 
                         <!-- Collapsible visualization content -->
                         <div class="layer5-visuals-content collapsed" id="layer5Visuals-${matchIndex}">
-                        <!-- Row 1: Radar + Agent Performance -->
+                        <!-- Row 1: Dimension Scores + Success Likelihood -->
                         <div class="visualization-container">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
                                 <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('agentBarChart-${matchIndex}', 'Agent Performance')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Agent Performance</h4>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('agentBarChart-${matchIndex}', 'Partnership Success')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #10b981;">🎯 Partnership Success</h4>
                                 <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                         </div>
 
-                        <!-- Row 2: Ranked Strengths + Action Items -->
+                        <!-- Row 2: Ranked Strengths + Value Breakdown -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Ranked Strengths')">
                                 <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Ranked Strengths</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Action Items Found')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Action Items Found</h4>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Connection Value')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #ec4899;">💰 Connection Value</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                         </div>
@@ -1012,6 +1012,8 @@
             }
         }
 
+        // REAL-WORLD INSIGHT: Partnership Success Likelihood
+        // Shows estimated probability of successful collaboration based on real factors
         function renderAgentBarChart(matchIndex, agentOutputs) {
             const ctx = document.getElementById(`agentBarChart-${matchIndex}`);
             if (!ctx) {
@@ -1019,62 +1021,78 @@
                 return;
             }
 
-            console.log(`Rendering agent bar chart for match ${matchIndex}`);
+            console.log(`Rendering Partnership Success Likelihood for match ${matchIndex}`);
 
             try {
-                const scores = {
-                'Business Synergy': agentOutputs?.business_synergy?.synergy_score || 0,
-                'Creative Collab': agentOutputs?.creative_collaboration?.creativity_score || 0,
-                'Risk Assessment': agentOutputs?.risk_compatibility?.compatibility_score || 0,
-                'Strategic Growth': agentOutputs?.strategic_growth?.strategic_score || 0,
-                'Tactical Planning': agentOutputs?.tactical_connection?.tactical_score || 0
-            };
+                // Calculate REAL-WORLD success factors from the data
+                const valueExchanges = agentOutputs?.business_synergy?.direct_value_exchanges?.length || 0;
+                const assetMatches = agentOutputs?.business_synergy?.asset_need_matches?.length || 0;
+                const redFlags = agentOutputs?.risk_compatibility?.red_flags?.length || 0;
+                const coCreationIdeas = agentOutputs?.creative_collaboration?.co_creation_ideas?.length || 0;
+                const networkEffects = agentOutputs?.creative_collaboration?.network_multiplication?.length || 0;
+                const compatibility = agentOutputs?.risk_compatibility?.compatibility_score || 50;
 
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(scores),
-                    datasets: [{
-                        label: 'Agent Scores',
-                        data: Object.values(scores),
-                        backgroundColor: [
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(118, 75, 162, 0.8)',
-                            'rgba(79, 172, 254, 0.8)',
-                            'rgba(0, 242, 254, 0.8)',
-                            'rgba(16, 185, 129, 0.8)'
-                        ],
-                        borderColor: [
-                            '#667eea',
-                            '#764ba2',
-                            '#4facfe',
-                            '#00f2fe',
-                            '#10b981'
-                        ],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        },
-                        y: {
-                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 11 } },
-                            grid: { display: false }
-                        }
+                // Real-world success indicators (higher = better chances)
+                const successFactors = {
+                    'Business Fit': Math.min(100, (valueExchanges * 20) + (assetMatches * 15) + 20),
+                    'Low Risk': Math.max(0, 100 - (redFlags * 25)),
+                    'Innovation Potential': Math.min(100, (coCreationIdeas * 15) + 25),
+                    'Network Multiplier': Math.min(100, (networkEffects * 20) + 30),
+                    'Compatibility': compatibility
+                };
+
+                // Calculate overall success probability
+                const avgSuccess = Math.round(Object.values(successFactors).reduce((a,b) => a+b, 0) / Object.keys(successFactors).length);
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(successFactors),
+                        datasets: [{
+                            label: 'Success Factor',
+                            data: Object.values(successFactors),
+                            backgroundColor: Object.values(successFactors).map(v =>
+                                v >= 70 ? 'rgba(16, 185, 129, 0.8)' :  // Green - high
+                                v >= 50 ? 'rgba(251, 191, 36, 0.8)' :  // Yellow - medium
+                                'rgba(239, 68, 68, 0.8)'               // Red - low
+                            ),
+                            borderColor: Object.values(successFactors).map(v =>
+                                v >= 70 ? '#10b981' : v >= 50 ? '#fbbf24' : '#ef4444'
+                            ),
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
                     },
-                    plugins: {
-                        legend: { display: false }
+                    options: {
+                        indexAxis: 'y',
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    color: 'rgba(255,255,255,0.7)',
+                                    callback: v => v + '%'
+                                },
+                                grid: { color: 'rgba(255,255,255,0.1)' }
+                            },
+                            y: {
+                                ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 10 } },
+                                grid: { display: false }
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: `Overall Success Likelihood: ${avgSuccess}%`,
+                                color: avgSuccess >= 70 ? '#10b981' : avgSuccess >= 50 ? '#fbbf24' : '#ef4444',
+                                font: { size: 12, weight: 'bold' }
+                            }
+                        }
                     }
-                }
-            });
+                });
             } catch (error) {
-                console.error(`Error rendering agent bar chart for match ${matchIndex}:`, error);
+                console.error(`Error rendering partnership success for match ${matchIndex}:`, error);
             }
         }
 
@@ -1166,6 +1184,8 @@
             }
         }
 
+        // REAL-WORLD INSIGHT: Connection Value Breakdown
+        // Shows WHERE the value in this connection comes from
         function renderOpportunityTiming(matchIndex, agentOutputs, scoring) {
             const ctx = document.getElementById(`opportunityTiming-${matchIndex}`);
             if (!ctx) {
@@ -1173,92 +1193,83 @@
                 return;
             }
 
-            console.log(`Rendering action readiness for match ${matchIndex}`);
+            console.log(`Rendering Connection Value Breakdown for match ${matchIndex}`);
 
             try {
-                // Count actual deliverables from agents
-                const immediateActions = agentOutputs?.tactical_connection?.immediate_actions || [];
-                const conversationStarters = agentOutputs?.tactical_connection?.conversation_starters || [];
-                const valueExchanges = agentOutputs?.business_synergy?.direct_value_exchanges || [];
-                const coCreationIdeas = agentOutputs?.creative_collaboration?.co_creation_ideas || [];
-                const growthOpportunities = agentOutputs?.strategic_growth?.market_expansion_opportunities || [];
-                const redFlags = agentOutputs?.risk_compatibility?.red_flags || [];
+                // Calculate REAL VALUE categories from agent data
+                const valueExchanges = agentOutputs?.business_synergy?.direct_value_exchanges?.length || 0;
+                const assetMatches = agentOutputs?.business_synergy?.asset_need_matches?.length || 0;
+                const resourceSharing = agentOutputs?.business_synergy?.resource_sharing_opportunities?.length || 0;
+                const networkEffects = agentOutputs?.creative_collaboration?.network_multiplication?.length || 0;
+                const coCreation = agentOutputs?.creative_collaboration?.co_creation_ideas?.length || 0;
+                const growthPaths = agentOutputs?.strategic_growth?.market_expansion_opportunities?.length || 0;
 
-                // Real counts of actionable items
-                const actionableItems = {
-                    'Conversation Starters': conversationStarters.length,
-                    'Immediate Actions': immediateActions.length,
-                    'Value Exchanges': valueExchanges.length,
-                    'Co-Creation Ideas': coCreationIdeas.length,
-                    'Growth Paths': growthOpportunities.length
+                // Estimate REAL-WORLD VALUE distribution (weighted by impact)
+                const valueDistribution = {
+                    'Revenue Potential': (valueExchanges * 25) + (assetMatches * 20),
+                    'Cost Savings': (resourceSharing * 30) + (assetMatches * 10),
+                    'Network Expansion': (networkEffects * 35) + 10,
+                    'Innovation/IP': (coCreation * 25) + 15,
+                    'Market Access': (growthPaths * 30) + 10
                 };
 
-                // Filter to only show items with actual content
-                const filteredLabels = Object.keys(actionableItems).filter(k => actionableItems[k] > 0);
-                const filteredData = filteredLabels.map(k => actionableItems[k]);
+                // Normalize to percentages (of total value)
+                const totalValue = Object.values(valueDistribution).reduce((a,b) => a+b, 0);
+                const normalizedData = Object.values(valueDistribution).map(v =>
+                    totalValue > 0 ? Math.round((v / totalValue) * 100) : 20
+                );
 
-                // If no data, show a message
-                if (filteredLabels.length === 0) {
-                    ctx.parentElement.innerHTML = `
-                        <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Action Items Found</h4>
-                        <div style="text-align: center; padding: 2rem; opacity: 0.6;">
-                            <p>Generating insights...</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: filteredLabels,
-                    datasets: [{
-                        label: 'Items Found',
-                        data: filteredData,
-                        backgroundColor: [
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(79, 172, 254, 0.8)',
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(251, 146, 60, 0.8)',
-                            'rgba(118, 75, 162, 0.8)'
-                        ].slice(0, filteredLabels.length),
-                        borderColor: [
-                            '#10b981', '#4facfe', '#667eea', '#fb923c', '#764ba2'
-                        ].slice(0, filteredLabels.length),
-                        borderWidth: 2,
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            ticks: {
-                                color: 'rgba(255,255,255,0.7)',
-                                stepSize: 1,
-                                callback: function(value) { return Number.isInteger(value) ? value : ''; }
-                            },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        },
-                        y: {
-                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 11 } },
-                            grid: { display: false }
-                        }
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(valueDistribution),
+                        datasets: [{
+                            data: normalizedData,
+                            backgroundColor: [
+                                'rgba(16, 185, 129, 0.85)',  // Green - Revenue
+                                'rgba(59, 130, 246, 0.85)',  // Blue - Cost Savings
+                                'rgba(139, 92, 246, 0.85)',  // Purple - Network
+                                'rgba(251, 146, 60, 0.85)',  // Orange - Innovation
+                                'rgba(236, 72, 153, 0.85)'   // Pink - Market
+                            ],
+                            borderColor: '#1a1a2e',
+                            borderWidth: 2,
+                            hoverOffset: 8
+                        }]
                     },
-                    plugins: {
-                        legend: { display: false },
-                        title: {
-                            display: true,
-                            text: 'Actionable Items Identified',
-                            color: 'rgba(255,255,255,0.8)',
-                            font: { size: 11 }
+                    options: {
+                        cutout: '55%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: 'rgba(255,255,255,0.9)',
+                                    font: { size: 9 },
+                                    padding: 8,
+                                    usePointStyle: true,
+                                    generateLabels: function(chart) {
+                                        const data = chart.data;
+                                        return data.labels.map((label, i) => ({
+                                            text: `${label}: ${data.datasets[0].data[i]}%`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: '#1a1a2e',
+                                            lineWidth: 1,
+                                            index: i
+                                        }));
+                                    }
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Value Distribution',
+                                color: 'rgba(255,255,255,0.8)',
+                                font: { size: 11 }
+                            }
                         }
                     }
-                }
-            });
+                });
             } catch (error) {
-                console.error(`Error rendering action readiness for match ${matchIndex}:`, error);
+                console.error(`Error rendering connection value for match ${matchIndex}:`, error);
             }
         }
 
@@ -1587,6 +1598,30 @@
 
         // SINGLE EVENT DELEGATION HANDLER FOR ALL CARD INTERACTIONS
         document.addEventListener('click', function(e) {
+            // === OPPORTUNITY CARD CLICKED (check FIRST - highest priority) ===
+            const opportunityCard = e.target.closest('.clickable-opportunity');
+            if (opportunityCard) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const matchMemberId = opportunityCard.dataset.matchId;
+                const matchName = opportunityCard.dataset.matchName;
+                const matchOrg = opportunityCard.dataset.matchOrg;
+                const oppIndex = parseInt(opportunityCard.dataset.oppIndex, 10);
+                const opportunityText = opportunityCard.dataset.oppText;
+
+                console.log('🎯 Opportunity clicked:', { matchName, oppIndex, text: opportunityText?.substring(0, 50) + '...' });
+
+                if (!opportunityText) {
+                    console.error('No opportunity text found');
+                    alert('Error: Could not load opportunity details.');
+                    return;
+                }
+
+                analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText);
+                return;
+            }
+
             // === CLOSE BUTTON CLICKED ===
             const closeBtn = e.target.closest('.close-card-btn');
             if (closeBtn) {
@@ -1768,33 +1803,9 @@
         }
 
         // ==============================================
-        // OPPORTUNITY DEEP ANALYSIS - EVENT DELEGATION
+        // OPPORTUNITY DEEP ANALYSIS FUNCTION
         // ==============================================
-
-        // Use event delegation for reliable click handling
-        document.addEventListener('click', function(e) {
-            const card = e.target.closest('.clickable-opportunity');
-            if (!card) return;
-
-            // Prevent the card toggle from firing
-            e.stopPropagation();
-
-            const matchMemberId = card.dataset.matchId;
-            const matchName = card.dataset.matchName;
-            const matchOrg = card.dataset.matchOrg;
-            const oppIndex = parseInt(card.dataset.oppIndex, 10);
-            const opportunityText = card.dataset.oppText;
-
-            console.log('🎯 Opportunity clicked via delegation:', { matchMemberId, matchName, matchOrg, oppIndex, opportunityText: opportunityText?.substring(0, 50) + '...' });
-
-            if (!opportunityText) {
-                console.error('No opportunity text found in data attribute');
-                alert('Error: Could not load opportunity details. Please try again.');
-                return;
-            }
-
-            analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText);
-        }, true); // Use capture phase to intercept before bubbling
+        // (Click handling is now in the unified handler above)
 
         async function analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText) {
             const overlay = document.getElementById('progressOverlay');
@@ -2058,8 +2069,17 @@
         // Initial load
         loadDashboard();
 
-        // Auto-refresh every 30 seconds
-        setInterval(loadDashboard, 30000);
+        // Auto-refresh DISABLED when any card is expanded
+        // Only refresh when all cards are collapsed (user not reading)
+        setInterval(() => {
+            const expandedCard = document.querySelector('.match-card.expanded');
+            if (!expandedCard) {
+                console.log('🔄 Auto-refresh (no expanded cards)');
+                loadDashboard();
+            } else {
+                console.log('⏸️ Skipping auto-refresh (card expanded)');
+            }
+        }, 60000); // 60 seconds, and only when nothing is expanded
     </script>
 </body>
 </html>
