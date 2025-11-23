@@ -777,7 +777,12 @@
                                 <div class="opportunities-grid" style="display: grid; gap: 1rem; margin-top: 1rem;">
                                     ${scoreData.synthesis.top_5_opportunities.map((opp, oppIndex) => `
                                         <div class="opportunity-card"
-                                             onclick="event.stopPropagation(); analyzeOpportunity('${match.member_id}', '${match.name}', '${match.org}', ${oppIndex}, \`${opp.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)"
+                                             data-match-id="${match.member_id}"
+                                             data-match-name="${(match.name || '').replace(/"/g, '&quot;')}"
+                                             data-match-org="${(match.org || '').replace(/"/g, '&quot;')}"
+                                             data-opp-index="${oppIndex}"
+                                             data-opp-text="${(opp || '').replace(/"/g, '&quot;').replace(/\n/g, ' ')}"
+                                             onclick="event.stopPropagation(); handleOpportunityClick(this)"
                                              style="padding: 1rem; background: rgba(79, 172, 254, 0.08); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
                                             <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
                                                 <span style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">${oppIndex + 1}</span>
@@ -856,9 +861,13 @@
                     if (scoreData && scoreData.scoring) {
                         console.log(`Match ${matchIndex} data structure:`, {
                             hasDimensionScores: !!scoreData.scoring.dimension_scores,
+                            dimensionScoresActual: scoreData.scoring.dimension_scores,
                             hasConfidence: !!scoreData.scoring.confidence,
                             hasAgentOutputs: !!scoreData.agent_outputs,
-                            agentKeys: scoreData.agent_outputs ? Object.keys(scoreData.agent_outputs) : []
+                            agentKeys: scoreData.agent_outputs ? Object.keys(scoreData.agent_outputs) : [],
+                            businessSynergyScore: scoreData.agent_outputs?.business_synergy?.synergy_score,
+                            creativeScore: scoreData.agent_outputs?.creative_collaboration?.creativity_score,
+                            strategicScore: scoreData.agent_outputs?.strategic_growth?.strategic_score
                         });
                         renderRadarChart(matchIndex, scoreData.scoring.dimension_scores);
                         renderAgentBarChart(matchIndex, scoreData.agent_outputs);
@@ -1448,39 +1457,59 @@
 
         // Track touch/scroll state to prevent ghost clicks
         let touchStartY = 0;
+        let touchStartX = 0;
         let touchStartTime = 0;
         let lastClickTime = 0;
+        let touchMoved = false;
 
         document.addEventListener('touchstart', function(e) {
             touchStartY = e.touches[0].clientY;
+            touchStartX = e.touches[0].clientX;
             touchStartTime = Date.now();
+            touchMoved = false;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (touchStartTime > 0) {
+                const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+                const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+                // If moved more than 10px, consider it a scroll
+                if (deltaY > 10 || deltaX > 10) {
+                    touchMoved = true;
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            // Reset after a delay to allow click to process
+            setTimeout(() => {
+                touchStartTime = 0;
+                touchMoved = false;
+            }, 100);
         }, { passive: true });
 
         // Safe toggle that filters out scroll-triggered clicks
         function safeToggleMatch(event, matchIndex, containerId) {
+            // If user scrolled (touch moved), don't toggle
+            if (touchMoved) {
+                console.log('Ignoring click - user was scrolling');
+                return;
+            }
+
             // Prevent double-click issues
             const now = Date.now();
-            if (now - lastClickTime < 300) {
+            if (now - lastClickTime < 400) {
                 return; // Ignore rapid clicks
             }
             lastClickTime = now;
 
-            // Check if this came from a touch event that moved (scroll)
-            if (event.type === 'click' && touchStartTime > 0) {
-                const timeSinceTouch = now - touchStartTime;
-                // If it's been a while since touch started, likely a scroll-then-click
-                if (timeSinceTouch > 500) {
-                    touchStartTime = 0;
-                    return; // Likely a scroll ghost click
-                }
-            }
-
             // Check if the click target is an interactive element that should NOT trigger expansion
             const target = event.target;
             const tagName = target.tagName.toLowerCase();
-            if (tagName === 'button' || tagName === 'a' || tagName === 'canvas' ||
+            if (tagName === 'button' || tagName === 'a' || tagName === 'canvas' || tagName === 'li' ||
                 target.closest('button') || target.closest('a') || target.closest('canvas') ||
-                target.closest('.opportunity-card') || target.closest('.layer5-toggle-btn')) {
+                target.closest('.opportunity-card') || target.closest('.layer5-toggle-btn') ||
+                target.closest('.layer-1') || target.closest('ul') || target.closest('pre')) {
                 return; // Don't toggle when clicking interactive elements
             }
 
@@ -1625,6 +1654,18 @@
         // ==============================================
         // OPPORTUNITY DEEP ANALYSIS
         // ==============================================
+
+        // Handler that reads data from element attributes
+        function handleOpportunityClick(element) {
+            const matchMemberId = element.dataset.matchId;
+            const matchName = element.dataset.matchName;
+            const matchOrg = element.dataset.matchOrg;
+            const oppIndex = parseInt(element.dataset.oppIndex, 10);
+            const opportunityText = element.dataset.oppText;
+
+            console.log('Opportunity clicked:', { matchMemberId, matchName, matchOrg, oppIndex, opportunityText });
+            analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText);
+        }
 
         async function analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText) {
             const overlay = document.getElementById('progressOverlay');
