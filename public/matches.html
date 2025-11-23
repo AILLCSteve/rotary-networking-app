@@ -400,6 +400,39 @@
             pointer-events: none;
         }
 
+        /* Close button - hidden in compact, visible in expanded */
+        .close-card-btn {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 100;
+            pointer-events: auto !important;
+            transition: all 0.2s ease;
+        }
+
+        .close-card-btn:hover {
+            background: rgba(239, 68, 68, 1);
+            transform: scale(1.05);
+        }
+
+        .v2-format.expanded .close-card-btn {
+            display: block;
+        }
+
+        /* Ensure match-card can contain absolute positioned close button */
+        .match-card {
+            position: relative;
+        }
+
         /* Expanded content */
         .v2-expanded-content {
             display: none;
@@ -664,9 +697,12 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="safeToggleMatch(event, ${matchIndex}, '${containerId}')">
-                    <!-- Clickable compact area -->
-                    <div class="compact-clickable-area">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" data-match-index="${matchIndex}">
+                    <!-- Close button - OUTSIDE compact-clickable-area so it's always clickable when visible -->
+                    <button class="close-card-btn" data-action="close" data-match-index="${matchIndex}" data-container="${containerId}">✕ Close</button>
+
+                    <!-- Clickable compact area - ONLY this triggers expansion -->
+                    <div class="compact-clickable-area" data-action="expand">
                         <!-- HEADER -->
                         <div class="match-header-v2">
                             <h3>${match.name}</h3>
@@ -1517,95 +1553,110 @@
         }
 
         // ==============================================
-        // CLICK-TO-EXPAND FUNCTIONALITY
+        // CARD EXPAND/CLOSE - EVENT DELEGATION SYSTEM
         // ==============================================
+        //
+        // NEW BEHAVIOR:
+        // - Click COMPACT card's clickable area → EXPAND that card
+        // - Click CLOSE BUTTON → CLOSE the expanded card
+        // - NOTHING ELSE closes the card (no accidental closes)
+        //
 
-        // Track touch/scroll state to prevent ghost clicks
+        // Track touch/scroll state to prevent ghost clicks on mobile
         let touchStartY = 0;
         let touchStartX = 0;
-        let touchStartTime = 0;
-        let lastClickTime = 0;
         let touchMoved = false;
 
         document.addEventListener('touchstart', function(e) {
             touchStartY = e.touches[0].clientY;
             touchStartX = e.touches[0].clientX;
-            touchStartTime = Date.now();
             touchMoved = false;
         }, { passive: true });
 
         document.addEventListener('touchmove', function(e) {
-            if (touchStartTime > 0) {
-                const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-                const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
-                // If moved more than 10px, consider it a scroll
-                if (deltaY > 10 || deltaX > 10) {
-                    touchMoved = true;
-                }
+            const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+            const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+            if (deltaY > 10 || deltaX > 10) {
+                touchMoved = true;
             }
         }, { passive: true });
 
         document.addEventListener('touchend', function(e) {
-            // Reset after a delay to allow click to process
-            setTimeout(() => {
-                touchStartTime = 0;
-                touchMoved = false;
-            }, 100);
+            setTimeout(() => { touchMoved = false; }, 150);
         }, { passive: true });
 
-        // Safe toggle that filters out scroll-triggered clicks
-        function safeToggleMatch(event, matchIndex, containerId) {
-            // If user scrolled (touch moved), don't toggle
-            if (touchMoved) {
-                console.log('Ignoring click - user was scrolling');
+        // SINGLE EVENT DELEGATION HANDLER FOR ALL CARD INTERACTIONS
+        document.addEventListener('click', function(e) {
+            // === CLOSE BUTTON CLICKED ===
+            const closeBtn = e.target.closest('.close-card-btn');
+            if (closeBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const matchIndex = closeBtn.dataset.matchIndex;
+                const containerId = closeBtn.dataset.container;
+
+                console.log('🔴 Close button clicked for match', matchIndex);
+                collapseCard(matchIndex, containerId);
                 return;
             }
 
-            // Prevent double-click issues
-            const now = Date.now();
-            if (now - lastClickTime < 400) {
-                return; // Ignore rapid clicks
+            // === COMPACT CARD CLICKED (to expand) ===
+            const clickableArea = e.target.closest('.compact-clickable-area');
+            if (clickableArea) {
+                // Only expand if the card is currently COMPACT
+                const card = clickableArea.closest('.match-card');
+                if (!card || !card.classList.contains('compact')) {
+                    return; // Already expanded, do nothing
+                }
+
+                // Ignore if user was scrolling (mobile)
+                if (touchMoved) {
+                    console.log('Ignoring - user was scrolling');
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const matchIndex = card.dataset.matchIndex;
+                const containerId = card.dataset.container;
+
+                console.log('🟢 Expanding card', matchIndex);
+                expandCard(matchIndex, containerId);
+                return;
             }
-            lastClickTime = now;
+        }, true); // capture phase
 
-            // Check if the click target is an interactive element that should NOT trigger expansion
-            const target = event.target;
-            const tagName = target.tagName.toLowerCase();
-            if (tagName === 'button' || tagName === 'a' || tagName === 'canvas' || tagName === 'li' ||
-                target.closest('button') || target.closest('a') || target.closest('canvas') ||
-                target.closest('.opportunity-card') || target.closest('.layer5-toggle-btn') ||
-                target.closest('.layer-1') || target.closest('ul') || target.closest('pre')) {
-                return; // Don't toggle when clicking interactive elements
-            }
-
-            // Safe to toggle
-            toggleMatchExpansion(matchIndex, containerId);
-        }
-
-        function toggleMatchExpansion(matchIndex, containerId) {
-            const clickedCard = document.getElementById(`match-${matchIndex}`);
+        // EXPAND a specific card
+        function expandCard(matchIndex, containerId) {
+            const card = document.getElementById(`match-${matchIndex}`);
             const container = document.getElementById(containerId);
+            if (!card || !container) return;
+
             const allCards = container.querySelectorAll('.v2-format');
 
-            // If already expanded, collapse all
-            if (clickedCard.classList.contains('expanded')) {
-                allCards.forEach(card => {
-                    card.classList.remove('expanded', 'faded');
-                    card.classList.add('compact');
-                });
-                return;
-            }
-
-            // Expand this card, fade others
-            allCards.forEach(card => {
-                if (card.id === `match-${matchIndex}`) {
-                    card.classList.remove('compact', 'faded');
-                    card.classList.add('expanded');
-                    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+            allCards.forEach(c => {
+                if (c.id === `match-${matchIndex}`) {
+                    c.classList.remove('compact', 'faded');
+                    c.classList.add('expanded');
+                    setTimeout(() => c.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
                 } else {
-                    card.classList.remove('compact', 'expanded');
-                    card.classList.add('faded');
+                    c.classList.remove('compact', 'expanded');
+                    c.classList.add('faded');
                 }
+            });
+        }
+
+        // COLLAPSE a specific card (and restore all to compact)
+        function collapseCard(matchIndex, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const allCards = container.querySelectorAll('.v2-format');
+            allCards.forEach(card => {
+                card.classList.remove('expanded', 'faded');
+                card.classList.add('compact');
             });
         }
 
