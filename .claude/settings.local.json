@@ -8,7 +8,15 @@
       "Bash(npm run check-db:*)",
       "Bash(node load-test-data.js:*)",
       "Bash(npm start)",
-      "Bash(node load-local-business-data.js:*)"
+      "Bash(node load-local-business-data.js:*)",
+      "Bash(/tmp/v4_server.js)",
+      "Bash(/tmp/v4_nexus.js)",
+      "Bash(\"C:/Users/pr0ph/Documents/AI LLC/Rotary Club Networking App/rotary-networking for deploy/v4_server_analysis.js\")",
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

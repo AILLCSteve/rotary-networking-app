@@ -1162,15 +1162,16 @@
                         legend: {
                             position: 'bottom',
                             labels: {
-                                color: 'rgba(255,255,255,0.9)',
-                                font: { size: 10 },
-                                padding: 8,
+                                color: 'rgba(255,255,255,0.95)',
+                                font: { size: 12, weight: '500' },
+                                padding: 10,
                                 generateLabels: function(chart) {
                                     const data = chart.data;
                                     return data.labels.map((label, i) => ({
                                         text: `${label}: ${data.datasets[0].data[i]}`,
                                         fillStyle: data.datasets[0].backgroundColor[i],
                                         strokeStyle: data.datasets[0].borderColor,
+                                        fontColor: 'rgba(255,255,255,0.95)',
                                         lineWidth: 1,
                                         index: i
                                     }));
@@ -1180,8 +1181,8 @@
                         title: {
                             display: true,
                             text: 'Ranked Strengths',
-                            color: 'rgba(255,255,255,0.8)',
-                            font: { size: 11 }
+                            color: 'rgba(255,255,255,0.9)',
+                            font: { size: 12, weight: '600' }
                         }
                     }
                 }
@@ -1250,9 +1251,9 @@
                             legend: {
                                 position: 'bottom',
                                 labels: {
-                                    color: 'rgba(255,255,255,0.9)',
-                                    font: { size: 9 },
-                                    padding: 8,
+                                    color: 'rgba(255,255,255,0.95)',
+                                    font: { size: 12, weight: '500' },
+                                    padding: 10,
                                     usePointStyle: true,
                                     generateLabels: function(chart) {
                                         const data = chart.data;
@@ -1260,6 +1261,7 @@
                                             text: `${label}: ${data.datasets[0].data[i]}%`,
                                             fillStyle: data.datasets[0].backgroundColor[i],
                                             strokeStyle: '#1a1a2e',
+                                            fontColor: 'rgba(255,255,255,0.95)',
                                             lineWidth: 1,
                                             index: i
                                         }));
@@ -1269,8 +1271,8 @@
                             title: {
                                 display: true,
                                 text: 'Value Distribution',
-                                color: 'rgba(255,255,255,0.8)',
-                                font: { size: 11 }
+                                color: 'rgba(255,255,255,0.9)',
+                                font: { size: 12, weight: '600' }
                             }
                         }
                     }
@@ -1750,8 +1752,8 @@
                 <p style="text-align: center; margin-top: 2rem; color: rgba(255, 255, 255, 0.6); font-size: 0.9rem;">Click anywhere to close</p>
             `;
 
-            // Show the overlay (reuse progress overlay)
-            overlay.classList.remove('hidden');
+            // Show the overlay (use .active class like showProgressOverlay)
+            overlay.classList.add('active');
 
             // Clone the chart to the popup canvas
             setTimeout(() => {
@@ -1773,7 +1775,7 @@
 
             // Only close if showing visualization (not progress)
             if (vizBox.style.display === 'block') {
-                overlay.classList.add('hidden');
+                overlay.classList.remove('active');
                 vizBox.style.display = 'none';
                 vizBox.innerHTML = '';
                 progressBox.style.display = 'block';
@@ -1851,7 +1853,8 @@
                     <p style="color: rgba(255, 255, 255, 0.6); margin-top: 1rem; font-size: 0.9rem;">This typically takes 5-10 seconds</p>
                 </div>
             `;
-            overlay.classList.remove('hidden');
+            // Use .active class to show overlay (same as showProgressOverlay)
+            overlay.classList.add('active');
 
             try {
                 const response = await fetch('/api/analyze-opportunity', {
