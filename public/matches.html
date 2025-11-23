@@ -297,7 +297,8 @@
         .layer-title {
             font-size: 1.3rem;
             margin-bottom: 1.5rem;
-            color: #4facfe;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 0 12px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.5);
             font-weight: 700;
         }
 
@@ -368,7 +369,8 @@
         }
 
         .opportunities-section h4 {
-            color: #4facfe;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.5);
             margin-bottom: 1rem;
             font-size: 1.1rem;
         }
@@ -520,19 +522,21 @@
             padding: 1.5rem;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 12px;
-            border: 1px solid rgba(79, 172, 254, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .metric-label {
             font-size: 0.85rem;
-            opacity: 0.7;
+            color: rgba(255, 255, 255, 0.7);
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5);
             margin-bottom: 0.5rem;
         }
 
         .metric-value {
             font-size: 2rem;
             font-weight: 700;
-            color: #4facfe;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .quality-notes {
@@ -739,11 +743,11 @@
                         <!-- Row 1: Dimension Scores + Success Likelihood -->
                         <div class="visualization-container">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('radarChart-${matchIndex}', 'Dimension Scores')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Dimension Scores</h4>
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">Dimension Scores</h4>
                                 <canvas id="radarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('agentBarChart-${matchIndex}', 'Partnership Success')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #10b981;">🎯 Partnership Success</h4>
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">🎯 Partnership Success</h4>
                                 <canvas id="agentBarChart-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                         </div>
@@ -751,11 +755,11 @@
                         <!-- Row 2: Ranked Strengths + Value Breakdown -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Ranked Strengths')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Ranked Strengths</h4>
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">Ranked Strengths</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Connection Value')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #ec4899;">💰 Connection Value</h4>
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">💰 Connection Value</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                         </div>
@@ -763,7 +767,7 @@
                         <!-- Row 3: Value Exchange + Match Strengths -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
                             <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('valueExchange-${matchIndex}', 'Value Exchange')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Value Exchange</h4>
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5);">Value Exchange</h4>
                                 <canvas id="valueExchange-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                             <div class="confidence-matrix" id="matchStrengths-${matchIndex}">
@@ -773,17 +777,17 @@
 
                         <!-- Key Opportunities -->
                         ${scoreData.scoring?.dimension_scores ? `
-                        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border-left: 4px solid #10b981;">
-                            <h5 style="color: #00f2fe; margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
+                        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px; border-left: 4px solid rgba(255, 255, 255, 0.5);">
+                            <h5 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 12px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
                             ${[
                                 { label: 'Strategic Synergy', value: scoreData.scoring.dimension_scores.strategic_synergy || 0 },
                                 { label: 'Innovation Potential', value: scoreData.scoring.dimension_scores.innovation_potential || 0 },
                                 { label: 'Network Effects', value: scoreData.scoring.dimension_scores.network_effects || 0 },
                                 { label: 'Tactical Value', value: scoreData.scoring.dimension_scores.tactical_value || 0 }
                             ].sort((a, b) => b.value - a.value).slice(0, 3).map((opp, i) => `
-                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border-radius: 6px;">
-                                    <strong style="color: #10b981;">${i + 1}.</strong> ${opp.label}
-                                    <span style="float: right; color: #4facfe; font-weight: 600;">${Math.round(opp.value)}</span>
+                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-radius: 6px; color: rgba(255, 255, 255, 0.9);">
+                                    <strong style="color: rgba(255, 255, 255, 0.95);">${i + 1}.</strong> ${opp.label}
+                                    <span style="float: right; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); font-weight: 600;">${Math.round(opp.value)}</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -812,21 +816,24 @@
                                 <h4>Top 5 Strategic Opportunities <span style="font-size: 0.8rem; opacity: 0.7;">(click for deep analysis)</span>:</h4>
                                 <div class="opportunities-grid" style="display: grid; gap: 1rem; margin-top: 1rem;">
                                     ${scoreData.synthesis.top_5_opportunities.map((opp, oppIndex) => {
-                                        // Store opportunity data for click handler
-                                        const safeOpp = String(opp || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ').replace(/\r/g, '');
+                                        // Store opportunity data for click handler - use base64 encoding for safety
+                                        const oppText = String(opp || '');
+                                        const safeOppB64 = btoa(encodeURIComponent(oppText));
+                                        const safeName = String(match.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                        const safeOrg = String(match.org || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                                         return `
                                         <div class="opportunity-card clickable-opportunity"
                                              data-match-id="${match.member_id || ''}"
-                                             data-match-name="${String(match.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"
-                                             data-match-org="${String(match.org || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"
+                                             data-match-name="${safeName}"
+                                             data-match-org="${safeOrg}"
                                              data-opp-index="${oppIndex}"
-                                             data-opp-text="${safeOpp}"
-                                             style="padding: 1rem; background: rgba(79, 172, 254, 0.08); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 10px; cursor: pointer; transition: all 0.3s ease; user-select: none;">
+                                             data-opp-b64="${safeOppB64}"
+                                             style="padding: 1rem; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 10px; cursor: pointer; transition: all 0.3s ease; user-select: none;">
                                             <div style="display: flex; align-items: flex-start; gap: 0.75rem; pointer-events: none;">
-                                                <span style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">${oppIndex + 1}</span>
+                                                <span style="background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7)); color: #1a1a2e; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">${oppIndex + 1}</span>
                                                 <div style="flex: 1;">
-                                                    <div style="font-size: 0.95rem; line-height: 1.5;">${opp}</div>
-                                                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #4facfe; opacity: 0.8;">🔍 Click to explore with AI</div>
+                                                    <div style="font-size: 0.95rem; line-height: 1.5; color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5);">${opp}</div>
+                                                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);">🔍 Click to explore with AI</div>
                                                 </div>
                                             </div>
                                         </div>`;
@@ -1373,13 +1380,13 @@
 
             container.innerHTML = `
                 <div style="padding: 1.5rem;">
-                    <h4 style="color: #4facfe; margin-bottom: 1rem; text-align: center;">Actionable Insights</h4>
+                    <h4 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 12px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 1rem; text-align: center;">Actionable Insights</h4>
 
                     ${topStarters.length > 0 ? `
                         <div style="margin-bottom: 1.25rem;">
-                            <h5 style="color: #10b981; margin-bottom: 0.5rem; font-size: 0.9rem;">💬 Conversation Starters</h5>
+                            <h5 style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5); margin-bottom: 0.5rem; font-size: 0.9rem;">💬 Conversation Starters</h5>
                             ${topStarters.map(starter => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.15); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-left: 3px solid rgba(255, 255, 255, 0.5); border-radius: 6px; font-size: 0.85rem; line-height: 1.5; color: rgba(255, 255, 255, 0.9);">
                                     "${starter}"
                                 </div>
                             `).join('')}
@@ -1388,9 +1395,9 @@
 
                     ${topActions.length > 0 ? `
                         <div style="margin-bottom: 1.25rem;">
-                            <h5 style="color: #4facfe; margin-bottom: 0.5rem; font-size: 0.9rem;">⚡ Quick Actions</h5>
+                            <h5 style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5); margin-bottom: 0.5rem; font-size: 0.9rem;">⚡ Quick Actions</h5>
                             ${topActions.map(action => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(79, 172, 254, 0.15); border-left: 3px solid #4facfe; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-left: 3px solid rgba(255, 255, 255, 0.5); border-radius: 6px; font-size: 0.85rem; line-height: 1.5; color: rgba(255, 255, 255, 0.9);">
                                     ${action}
                                 </div>
                             `).join('')}
@@ -1399,9 +1406,9 @@
 
                     ${topOpportunities.length > 0 ? `
                         <div>
-                            <h5 style="color: #00f2fe; margin-bottom: 0.5rem; font-size: 0.9rem;">🎯 Top Opportunities</h5>
+                            <h5 style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5); margin-bottom: 0.5rem; font-size: 0.9rem;">🎯 Top Opportunities</h5>
                             ${topOpportunities.map((opp, i) => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(0, 242, 254, 0.1); border-left: 3px solid #00f2fe; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-left: 3px solid rgba(255, 255, 255, 0.5); border-radius: 6px; font-size: 0.85rem; line-height: 1.5; color: rgba(255, 255, 255, 0.9);">
                                     <strong>#${i + 1}:</strong> ${opp}
                                 </div>
                             `).join('')}
@@ -1409,7 +1416,7 @@
                     ` : ''}
 
                     ${topStarters.length === 0 && topActions.length === 0 && topOpportunities.length === 0 ? `
-                        <div style="text-align: center; opacity: 0.7; padding: 1rem;">
+                        <div style="text-align: center; color: rgba(255, 255, 255, 0.7); padding: 1rem;">
                             <p>Explore the agent analysis below for detailed insights.</p>
                         </div>
                     ` : ''}
@@ -1433,20 +1440,20 @@
             matrix.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;">
                     <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.data_quality || 0}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Data Quality</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);">${confidence?.data_quality || 0}%</div>
+                        <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-top: 0.3rem;">Data Quality</div>
                     </div>
                     <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.agent_consensus || 0}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Agent Consensus</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);">${confidence?.agent_consensus || 0}%</div>
+                        <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-top: 0.3rem;">Agent Consensus</div>
                     </div>
                     <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #4facfe;">${confidence?.synthesis_quality || 0}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Synthesis Quality</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);">${confidence?.synthesis_quality || 0}%</div>
+                        <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-top: 0.3rem;">Synthesis Quality</div>
                     </div>
                     <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 10px;">
-                        <div style="font-size: 1.5rem; font-weight: 700; color: #00f2fe;">${confidence?.overall || 0}%</div>
-                        <div style="font-size: 0.8rem; opacity: 0.8; margin-top: 0.3rem;">Overall Confidence</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);">${confidence?.overall || 0}%</div>
+                        <div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-top: 0.3rem;">Overall Confidence</div>
                     </div>
                 </div>
             `;
@@ -1534,27 +1541,28 @@
                 }
 
                 const score = data[agent.scoreKey];
-                const scoreColor = score >= 75 ? '#10b981' : score >= 50 ? '#4facfe' : '#f59e0b';
+                // Use white/glow for scores with subtle variation for visual interest
+                const scoreGlow = score >= 75 ? 'rgba(180, 255, 200, 0.5)' : score >= 50 ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 200, 150, 0.5)';
 
                 return `
-                    <div style="background: rgba(255,255,255,0.05); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="background: rgba(255,255,255,0.05); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                            <h4 style="margin: 0; font-size: 0.95rem;">${agent.icon} ${agent.name}</h4>
-                            <div style="font-size: 1.1rem; font-weight: 700; color: ${scoreColor};">${score || 'N/A'}<span style="font-size: 0.75rem; opacity: 0.7;">/100</span></div>
+                            <h4 style="margin: 0; font-size: 0.95rem; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3), 0 1px 3px rgba(0, 0, 0, 0.5);">${agent.icon} ${agent.name}</h4>
+                            <div style="font-size: 1.1rem; font-weight: 700; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 12px ${scoreGlow}, 0 2px 4px rgba(0, 0, 0, 0.5);">${score || 'N/A'}<span style="font-size: 0.75rem; color: rgba(255, 255, 255, 0.6);">/100</span></div>
                         </div>
-                        ${data.confidence ? `<div style="font-size: 0.8rem; opacity: 0.6; margin-bottom: 0.5rem;">Confidence: ${Math.round(data.confidence)}%</div>` : ''}
-                        <div style="font-size: 0.85rem; line-height: 1.6;">
+                        ${data.confidence ? `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 0.5rem;">Confidence: ${Math.round(data.confidence)}%</div>` : ''}
+                        <div style="font-size: 0.85rem; line-height: 1.6; color: rgba(255, 255, 255, 0.85);">
                             ${insights.map(insight => `
                                 <div style="margin-bottom: 1rem;">
-                                    <strong style="color: #4facfe; font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">${insight.label}:</strong>
+                                    <strong style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2); font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">${insight.label}:</strong>
                                     ${insight.isArray ? `
-                                        <ul style="margin: 0; padding-left: 1.2rem; opacity: 0.9;">
+                                        <ul style="margin: 0; padding-left: 1.2rem; color: rgba(255, 255, 255, 0.85);">
                                             ${insight.value.map(item => `<li style="margin-bottom: 0.4rem;">${item}</li>`).join('')}
                                         </ul>
-                                    ` : `<div style="opacity: 0.9;">${insight.value}</div>`}
+                                    ` : `<div style="color: rgba(255, 255, 255, 0.85);">${insight.value}</div>`}
                                 </div>
                             `).join('')}
-                            ${insights.length === 0 ? '<div style="opacity: 0.6; font-style: italic;">Analysis complete - see score above</div>' : ''}
+                            ${insights.length === 0 ? '<div style="color: rgba(255, 255, 255, 0.6); font-style: italic;">Analysis complete - see score above</div>' : ''}
                         </div>
                     </div>
                 `;
@@ -1608,13 +1616,23 @@
                 const matchName = opportunityCard.dataset.matchName;
                 const matchOrg = opportunityCard.dataset.matchOrg;
                 const oppIndex = parseInt(opportunityCard.dataset.oppIndex, 10);
-                const opportunityText = opportunityCard.dataset.oppText;
+
+                // Decode base64-encoded opportunity text (handles all special characters safely)
+                let opportunityText = '';
+                try {
+                    const b64 = opportunityCard.dataset.oppB64;
+                    if (b64) {
+                        opportunityText = decodeURIComponent(atob(b64));
+                    }
+                } catch (decodeErr) {
+                    console.error('Failed to decode opportunity text:', decodeErr);
+                }
 
                 console.log('🎯 Opportunity clicked:', { matchName, oppIndex, text: opportunityText?.substring(0, 50) + '...' });
 
                 if (!opportunityText) {
                     console.error('No opportunity text found');
-                    alert('Error: Could not load opportunity details.');
+                    alert('Error: Could not load opportunity details. Please try refreshing the page.');
                     return;
                 }
 
@@ -1715,13 +1733,13 @@
             progressBox.style.display = 'none';
             vizBox.style.display = 'block';
 
-            // Clear and set up the popup
+            // Clear and set up the popup with white/glow styling
             vizBox.innerHTML = `
-                <h2 style="text-align: center; color: #4facfe; margin-bottom: 2rem; font-size: 2rem;">${title}</h2>
+                <h2 style="text-align: center; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 2rem; font-size: 2rem;">${title}</h2>
                 <div style="max-width: 1200px; max-height: 75vh; display: flex; justify-content: center; align-items: center;">
                     <canvas id="popupCanvas" style="max-width: 100%; height: auto;"></canvas>
                 </div>
-                <p style="text-align: center; margin-top: 2rem; opacity: 0.7; font-size: 0.9rem;">Click anywhere to close</p>
+                <p style="text-align: center; margin-top: 2rem; color: rgba(255, 255, 255, 0.6); font-size: 0.9rem;">Click anywhere to close</p>
             `;
 
             // Show the overlay (reuse progress overlay)
@@ -1812,17 +1830,17 @@
             const progressBox = document.getElementById('progressBox');
             const vizBox = document.getElementById('vizPopupCanvas');
 
-            // Show loading state in popup
+            // Show loading state in popup with white/glow styling
             progressBox.style.display = 'none';
             vizBox.style.display = 'block';
             vizBox.innerHTML = `
                 <div style="text-align: center; padding: 3rem;">
                     <div class="spinner" style="width: 60px; height: 60px; margin: 0 auto 2rem;"></div>
-                    <h2 style="color: #4facfe; margin-bottom: 1rem;">🧠 Deep Analysis in Progress</h2>
-                    <p style="opacity: 0.8; max-width: 500px; margin: 0 auto;">
+                    <h2 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 1rem;">🧠 Deep Analysis in Progress</h2>
+                    <p style="color: rgba(255, 255, 255, 0.85); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5); max-width: 500px; margin: 0 auto;">
                         Analyzing opportunity #${oppIndex + 1} for your connection with <strong>${matchName}</strong> at <strong>${matchOrg}</strong>...
                     </p>
-                    <p style="opacity: 0.6; margin-top: 1rem; font-size: 0.9rem;">This typically takes 5-10 seconds</p>
+                    <p style="color: rgba(255, 255, 255, 0.6); margin-top: 1rem; font-size: 0.9rem;">This typically takes 5-10 seconds</p>
                 </div>
             `;
             overlay.classList.remove('hidden');
@@ -1844,25 +1862,25 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    // Show the analysis result
+                    // Show the analysis result with white/glow font styling
                     vizBox.innerHTML = `
                         <div style="max-width: 800px; margin: 0 auto; padding: 2rem;">
-                            <h2 style="color: #4facfe; margin-bottom: 0.5rem; text-align: center;">🎯 Deep Opportunity Analysis</h2>
-                            <p style="text-align: center; opacity: 0.7; margin-bottom: 2rem;">
+                            <h2 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 0.5rem; text-align: center;">🎯 Deep Opportunity Analysis</h2>
+                            <p style="text-align: center; color: rgba(255, 255, 255, 0.85); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5); margin-bottom: 2rem;">
                                 For your connection with <strong>${matchName}</strong> at <strong>${matchOrg}</strong>
                             </p>
 
-                            <div style="background: rgba(79, 172, 254, 0.1); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
-                                <h4 style="color: #00f2fe; margin-bottom: 0.5rem;">Original Opportunity:</h4>
-                                <p style="opacity: 0.9; line-height: 1.6;">${opportunityText}</p>
+                            <div style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                                <h4 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5); margin-bottom: 0.5rem;">Original Opportunity:</h4>
+                                <p style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5); line-height: 1.6;">${opportunityText}</p>
                             </div>
 
-                            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
-                                <h4 style="color: #10b981; margin-bottom: 1rem;">🔍 Strategic Analysis:</h4>
-                                <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">${result.analysis}</div>
+                            <div style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                                <h4 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 1px 3px rgba(0, 0, 0, 0.5); margin-bottom: 1rem;">🔍 Strategic Analysis:</h4>
+                                <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem; color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5);">${result.analysis}</div>
                             </div>
 
-                            <p style="text-align: center; opacity: 0.6; font-size: 0.85rem; margin-top: 2rem;">Click anywhere to close</p>
+                            <p style="text-align: center; color: rgba(255, 255, 255, 0.6); font-size: 0.85rem; margin-top: 2rem;">Click anywhere to close</p>
                         </div>
                     `;
                 } else {
@@ -1872,9 +1890,9 @@
                 console.error('Opportunity analysis error:', error);
                 vizBox.innerHTML = `
                     <div style="text-align: center; padding: 3rem;">
-                        <h2 style="color: #f5576c; margin-bottom: 1rem;">❌ Analysis Failed</h2>
-                        <p style="opacity: 0.8;">${error.message}</p>
-                        <p style="opacity: 0.6; margin-top: 1rem; font-size: 0.9rem;">Click anywhere to close and try again</p>
+                        <h2 style="color: rgba(255, 150, 150, 0.95); text-shadow: 0 0 15px rgba(255, 100, 100, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 1rem;">❌ Analysis Failed</h2>
+                        <p style="color: rgba(255, 255, 255, 0.85); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2), 0 1px 2px rgba(0, 0, 0, 0.5);">${error.message}</p>
+                        <p style="color: rgba(255, 255, 255, 0.6); margin-top: 1rem; font-size: 0.9rem;">Click anywhere to close and try again</p>
                     </div>
                 `;
             }
