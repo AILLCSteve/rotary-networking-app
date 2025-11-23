@@ -775,23 +775,6 @@
                             </div>
                         </div>
 
-                        <!-- Key Opportunities -->
-                        ${scoreData.scoring?.dimension_scores ? `
-                        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.05); border-radius: 12px; border-left: 4px solid rgba(255, 255, 255, 0.5);">
-                            <h5 style="color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 12px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.5); margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
-                            ${[
-                                { label: 'Strategic Synergy', value: scoreData.scoring.dimension_scores.strategic_synergy || 0 },
-                                { label: 'Innovation Potential', value: scoreData.scoring.dimension_scores.innovation_potential || 0 },
-                                { label: 'Network Effects', value: scoreData.scoring.dimension_scores.network_effects || 0 },
-                                { label: 'Tactical Value', value: scoreData.scoring.dimension_scores.tactical_value || 0 }
-                            ].sort((a, b) => b.value - a.value).slice(0, 3).map((opp, i) => `
-                                <div style="margin-bottom: 0.75rem; padding: 0.75rem; background: rgba(255, 255, 255, 0.08); border-radius: 6px; color: rgba(255, 255, 255, 0.9);">
-                                    <strong style="color: rgba(255, 255, 255, 0.95);">${i + 1}.</strong> ${opp.label}
-                                    <span style="float: right; color: rgba(255, 255, 255, 0.95); text-shadow: 0 0 10px rgba(255, 255, 255, 0.3); font-weight: 600;">${Math.round(opp.value)}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        ` : ''}
                         </div>
                         <!-- End layer5-visuals-content -->
                     </div>
