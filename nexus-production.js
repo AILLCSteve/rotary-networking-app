@@ -379,22 +379,36 @@ async function performQualityControl(member1, member2, intelligence, agentOutput
     };
   }
 
-  const prompt = `Fact-check synthesis:
+  const prompt = `You are the Quality Control layer of a multi-agent AI system. Your job is to verify and fact-check the synthesis output from previous AI agents.
 
-SYNTHESIS: ${JSON.stringify(synthesis, null, 2)}
-RAW DATA: Intelligence: ${JSON.stringify(intelligence, null, 2)}, Agents: ${JSON.stringify(agentOutputs, null, 2)}
+SYNTHESIS TO VERIFY:
+${JSON.stringify(synthesis, null, 2)}
 
-Profiles: ${member1.name} (${member1.org}, ${member1.industry}) + ${member2.name} (${member2.org}, ${member2.industry})
+RAW DATA USED BY AGENTS:
+Intelligence: ${JSON.stringify(intelligence, null, 2)}
+Agent Outputs: ${JSON.stringify(agentOutputs, null, 2)}
 
-JSON output:
+MEMBER PROFILES:
+- ${member1.name} (${member1.org}, ${member1.industry})
+- ${member2.name} (${member2.org}, ${member2.industry})
+
+YOUR TASK:
+1. Review the synthesis and verify each claim against the raw data
+2. Identify which insights are well-supported vs. speculative
+3. Tag confidence levels and remove unsupported claims
+4. Provide a quality assessment
+
+Return JSON with these fields:
 {
-  "verified_synthesis": "Cleaned version",
-  "verified_opportunities": ["verified only", ...],
-  "confidence_tagged_narrative": "Narrative with [HIGH/MEDIUM/LOW CONFIDENCE] tags",
-  "removed_claims": ["removed because X", ...],
-  "verification_score": 0-100,
-  "quality_score": 0-100
-}`;
+  "verified_synthesis": "A cleaned version of the strategic narrative that only includes claims supported by the raw data. Summarize what was verified: which agent outputs support the key recommendations, what specific data points confirm the opportunities identified, and any caveats about confidence levels.",
+  "verified_opportunities": ["List only the opportunities that are directly supported by evidence in the agent outputs"],
+  "confidence_tagged_narrative": "The synthesis rewritten with [HIGH CONFIDENCE], [MEDIUM CONFIDENCE], or [LOW CONFIDENCE] tags before each major claim based on supporting evidence",
+  "removed_claims": ["List any claims that were removed or flagged because they lack supporting evidence, with brief explanation why"],
+  "verification_score": 85,
+  "quality_score": 88
+}
+
+Be specific in verified_synthesis - mention which agent findings support the recommendations.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',

@@ -1617,18 +1617,26 @@
                 const matchOrg = opportunityCard.dataset.matchOrg;
                 const oppIndex = parseInt(opportunityCard.dataset.oppIndex, 10);
 
-                // Decode base64-encoded opportunity text (handles all special characters safely)
+                // Decode opportunity text - support both new base64 format and legacy text format
                 let opportunityText = '';
                 try {
                     const b64 = opportunityCard.dataset.oppB64;
+                    const legacyText = opportunityCard.dataset.oppText;
+
                     if (b64) {
+                        // New format: base64-encoded
                         opportunityText = decodeURIComponent(atob(b64));
+                    } else if (legacyText) {
+                        // Legacy format: direct text (for old cached matches)
+                        opportunityText = legacyText;
                     }
                 } catch (decodeErr) {
                     console.error('Failed to decode opportunity text:', decodeErr);
+                    // Try legacy format as fallback
+                    opportunityText = opportunityCard.dataset.oppText || '';
                 }
 
-                console.log('🎯 Opportunity clicked:', { matchName, oppIndex, text: opportunityText?.substring(0, 50) + '...' });
+                console.log('🎯 Opportunity clicked:', { matchName, oppIndex, hasB64: !!opportunityCard.dataset.oppB64, hasLegacy: !!opportunityCard.dataset.oppText, text: opportunityText?.substring(0, 50) + '...' });
 
                 if (!opportunityText) {
                     console.error('No opportunity text found');
