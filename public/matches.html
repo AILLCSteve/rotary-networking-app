@@ -712,14 +712,14 @@
                             </div>
                         </div>
 
-                        <!-- Row 2: Synergy Breakdown + Opportunity Timing -->
+                        <!-- Row 2: Ranked Strengths + Action Items -->
                         <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Synergy Distribution')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Synergy Distribution</h4>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('synergyDoughnut-${matchIndex}', 'Ranked Strengths')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Ranked Strengths</h4>
                                 <canvas id="synergyDoughnut-${matchIndex}" width="400" height="400"></canvas>
                             </div>
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Opportunity Timing')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Opportunity Timing</h4>
+                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('opportunityTiming-${matchIndex}', 'Action Items Found')">
+                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Action Items Found</h4>
                                 <canvas id="opportunityTiming-${matchIndex}" width="400" height="400"></canvas>
                             </div>
                         </div>
@@ -775,24 +775,26 @@
                             <div class="opportunities-section">
                                 <h4>Top 5 Strategic Opportunities <span style="font-size: 0.8rem; opacity: 0.7;">(click for deep analysis)</span>:</h4>
                                 <div class="opportunities-grid" style="display: grid; gap: 1rem; margin-top: 1rem;">
-                                    ${scoreData.synthesis.top_5_opportunities.map((opp, oppIndex) => `
-                                        <div class="opportunity-card"
-                                             data-match-id="${match.member_id}"
-                                             data-match-name="${(match.name || '').replace(/"/g, '&quot;')}"
-                                             data-match-org="${(match.org || '').replace(/"/g, '&quot;')}"
+                                    ${scoreData.synthesis.top_5_opportunities.map((opp, oppIndex) => {
+                                        // Store opportunity data for click handler
+                                        const safeOpp = String(opp || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\n/g, ' ').replace(/\r/g, '');
+                                        return `
+                                        <div class="opportunity-card clickable-opportunity"
+                                             data-match-id="${match.member_id || ''}"
+                                             data-match-name="${String(match.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"
+                                             data-match-org="${String(match.org || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')}"
                                              data-opp-index="${oppIndex}"
-                                             data-opp-text="${(opp || '').replace(/"/g, '&quot;').replace(/\n/g, ' ')}"
-                                             onclick="event.stopPropagation(); handleOpportunityClick(this)"
-                                             style="padding: 1rem; background: rgba(79, 172, 254, 0.08); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
-                                            <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                                             data-opp-text="${safeOpp}"
+                                             style="padding: 1rem; background: rgba(79, 172, 254, 0.08); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 10px; cursor: pointer; transition: all 0.3s ease; user-select: none;">
+                                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; pointer-events: none;">
                                                 <span style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">${oppIndex + 1}</span>
                                                 <div style="flex: 1;">
                                                     <div style="font-size: 0.95rem; line-height: 1.5;">${opp}</div>
                                                     <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #4facfe; opacity: 0.8;">🔍 Click to explore with AI</div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    `).join('')}
+                                        </div>`;
+                                    }).join('')}
                                 </div>
                             </div>
                             ` : ''}
@@ -1047,45 +1049,78 @@
                 return;
             }
 
-            console.log(`Rendering synergy doughnut for match ${matchIndex}`);
+            console.log(`Rendering strengths vs gaps for match ${matchIndex}`);
 
             try {
-                const scores = {
-                'Strategic Synergy': dimensionScores?.strategic_synergy || 0,
-                'Tactical Value': dimensionScores?.tactical_value || 0,
-                'Innovation': dimensionScores?.innovation_potential || 0,
-                'Risk/Compat': dimensionScores?.risk_compatibility || 0,
-                'Network Effects': dimensionScores?.network_effects || 0,
-                'Temporal': dimensionScores?.temporal_urgency || 0
-            };
+                // Calculate strengths (high scores) vs gaps (areas to develop)
+                const strategic = dimensionScores?.strategic_synergy || 0;
+                const tactical = dimensionScores?.tactical_value || 0;
+                const innovation = dimensionScores?.innovation_potential || 0;
+                const compatibility = dimensionScores?.risk_compatibility || 0;
+                const network = dimensionScores?.network_effects || 0;
+
+                // Identify top 3 strengths and potential gaps
+                const allScores = [
+                    { name: 'Strategy', score: strategic },
+                    { name: 'Tactics', score: tactical },
+                    { name: 'Innovation', score: innovation },
+                    { name: 'Compatibility', score: compatibility },
+                    { name: 'Network', score: network }
+                ].sort((a, b) => b.score - a.score);
+
+                const strengths = allScores.slice(0, 3);
+                const gaps = allScores.slice(3);
 
             new Chart(ctx, {
-                type: 'doughnut',
+                type: 'polarArea',
                 data: {
-                    labels: Object.keys(scores),
+                    labels: allScores.map(s => s.name),
                     datasets: [{
-                        data: Object.values(scores),
+                        data: allScores.map(s => s.score),
                         backgroundColor: [
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(118, 75, 162, 0.8)',
-                            'rgba(79, 172, 254, 0.8)',
-                            'rgba(0, 242, 254, 0.8)',
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(251, 146, 60, 0.8)'
+                            'rgba(16, 185, 129, 0.7)',  // Green - strongest
+                            'rgba(79, 172, 254, 0.7)',  // Blue
+                            'rgba(102, 126, 234, 0.7)', // Purple
+                            'rgba(251, 146, 60, 0.6)',  // Orange - gaps
+                            'rgba(239, 68, 68, 0.5)'    // Red - weakest
                         ],
                         borderColor: '#1a1a2e',
-                        borderWidth: 2
+                        borderWidth: 1
                     }]
                 },
                 options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { display: false },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    },
                     plugins: {
                         legend: {
                             position: 'bottom',
                             labels: {
                                 color: 'rgba(255,255,255,0.9)',
-                                font: { size: 11 },
-                                padding: 10
+                                font: { size: 10 },
+                                padding: 8,
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    return data.labels.map((label, i) => ({
+                                        text: `${label}: ${data.datasets[0].data[i]}`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: data.datasets[0].borderColor,
+                                        lineWidth: 1,
+                                        index: i
+                                    }));
+                                }
                             }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Ranked Strengths',
+                            color: 'rgba(255,255,255,0.8)',
+                            font: { size: 11 }
                         }
                     }
                 }
@@ -1102,62 +1137,92 @@
                 return;
             }
 
-            console.log(`Rendering opportunity timing for match ${matchIndex}`);
+            console.log(`Rendering action readiness for match ${matchIndex}`);
 
             try {
-                // Use ACTUAL data from agents - count of real actions/opportunities
+                // Count actual deliverables from agents
                 const immediateActions = agentOutputs?.tactical_connection?.immediate_actions || [];
                 const conversationStarters = agentOutputs?.tactical_connection?.conversation_starters || [];
-                const growthOpportunities = agentOutputs?.strategic_growth?.market_expansion_opportunities || [];
+                const valueExchanges = agentOutputs?.business_synergy?.direct_value_exchanges || [];
                 const coCreationIdeas = agentOutputs?.creative_collaboration?.co_creation_ideas || [];
+                const growthOpportunities = agentOutputs?.strategic_growth?.market_expansion_opportunities || [];
+                const redFlags = agentOutputs?.risk_compatibility?.red_flags || [];
 
-                // Calculate REAL values based on what the agents actually found
-                // Immediate: how many actionable items right now
-                const immediateValue = Math.min(100, (immediateActions.length * 25) + (conversationStarters.length * 15));
-                // Short-term: creative collaboration opportunities
-                const shortTermValue = Math.min(100, (coCreationIdeas.length * 20) + (agentOutputs?.creative_collaboration?.creativity_score || 0) * 0.5);
-                // Long-term: strategic growth potential
-                const longTermValue = Math.min(100, (growthOpportunities.length * 25) + (agentOutputs?.strategic_growth?.strategic_score || 0) * 0.5);
+                // Real counts of actionable items
+                const actionableItems = {
+                    'Conversation Starters': conversationStarters.length,
+                    'Immediate Actions': immediateActions.length,
+                    'Value Exchanges': valueExchanges.length,
+                    'Co-Creation Ideas': coCreationIdeas.length,
+                    'Growth Paths': growthOpportunities.length
+                };
 
-            const labels = ['Immediate Actions', 'Near-Term Collaboration', 'Long-Term Growth'];
-            const data = [immediateValue, shortTermValue, longTermValue];
+                // Filter to only show items with actual content
+                const filteredLabels = Object.keys(actionableItems).filter(k => actionableItems[k] > 0);
+                const filteredData = filteredLabels.map(k => actionableItems[k]);
+
+                // If no data, show a message
+                if (filteredLabels.length === 0) {
+                    ctx.parentElement.innerHTML = `
+                        <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Action Items Found</h4>
+                        <div style="text-align: center; padding: 2rem; opacity: 0.6;">
+                            <p>Generating insights...</p>
+                        </div>
+                    `;
+                    return;
+                }
 
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: labels,
+                    labels: filteredLabels,
                     datasets: [{
-                        label: 'Opportunity Strength',
-                        data: data,
+                        label: 'Items Found',
+                        data: filteredData,
                         backgroundColor: [
-                            'rgba(16, 185, 129, 0.8)',  // Green for immediate
-                            'rgba(79, 172, 254, 0.8)',  // Blue for short-term
-                            'rgba(118, 75, 162, 0.8)'   // Purple for long-term
-                        ],
-                        borderColor: ['#10b981', '#4facfe', '#764ba2'],
-                        borderWidth: 2
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(251, 146, 60, 0.8)',
+                            'rgba(118, 75, 162, 0.8)'
+                        ].slice(0, filteredLabels.length),
+                        borderColor: [
+                            '#10b981', '#4facfe', '#667eea', '#fb923c', '#764ba2'
+                        ].slice(0, filteredLabels.length),
+                        borderWidth: 2,
+                        borderRadius: 6
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     scales: {
-                        y: {
+                        x: {
                             beginAtZero: true,
-                            max: 100,
-                            ticks: { color: 'rgba(255,255,255,0.7)' },
+                            ticks: {
+                                color: 'rgba(255,255,255,0.7)',
+                                stepSize: 1,
+                                callback: function(value) { return Number.isInteger(value) ? value : ''; }
+                            },
                             grid: { color: 'rgba(255,255,255,0.1)' }
                         },
-                        x: {
-                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 10 } },
+                        y: {
+                            ticks: { color: 'rgba(255,255,255,0.9)', font: { size: 11 } },
                             grid: { display: false }
                         }
                     },
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Actionable Items Identified',
+                            color: 'rgba(255,255,255,0.8)',
+                            font: { size: 11 }
+                        }
                     }
                 }
             });
             } catch (error) {
-                console.error(`Error rendering opportunity timing for match ${matchIndex}:`, error);
+                console.error(`Error rendering action readiness for match ${matchIndex}:`, error);
             }
         }
 
@@ -1652,20 +1717,33 @@
         }
 
         // ==============================================
-        // OPPORTUNITY DEEP ANALYSIS
+        // OPPORTUNITY DEEP ANALYSIS - EVENT DELEGATION
         // ==============================================
 
-        // Handler that reads data from element attributes
-        function handleOpportunityClick(element) {
-            const matchMemberId = element.dataset.matchId;
-            const matchName = element.dataset.matchName;
-            const matchOrg = element.dataset.matchOrg;
-            const oppIndex = parseInt(element.dataset.oppIndex, 10);
-            const opportunityText = element.dataset.oppText;
+        // Use event delegation for reliable click handling
+        document.addEventListener('click', function(e) {
+            const card = e.target.closest('.clickable-opportunity');
+            if (!card) return;
 
-            console.log('Opportunity clicked:', { matchMemberId, matchName, matchOrg, oppIndex, opportunityText });
+            // Prevent the card toggle from firing
+            e.stopPropagation();
+
+            const matchMemberId = card.dataset.matchId;
+            const matchName = card.dataset.matchName;
+            const matchOrg = card.dataset.matchOrg;
+            const oppIndex = parseInt(card.dataset.oppIndex, 10);
+            const opportunityText = card.dataset.oppText;
+
+            console.log('🎯 Opportunity clicked via delegation:', { matchMemberId, matchName, matchOrg, oppIndex, opportunityText: opportunityText?.substring(0, 50) + '...' });
+
+            if (!opportunityText) {
+                console.error('No opportunity text found in data attribute');
+                alert('Error: Could not load opportunity details. Please try again.');
+                return;
+            }
+
             analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText);
-        }
+        }, true); // Use capture phase to intercept before bubbling
 
         async function analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText) {
             const overlay = document.getElementById('progressOverlay');
