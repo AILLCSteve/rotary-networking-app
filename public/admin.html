@@ -93,11 +93,6 @@
                     <button class="btn btn-secondary" id="checkStatusBtn">📊 Check System Status</button>
                     <button class="btn btn-secondary" id="resetMatchesBtn" style="background: #ff9800; color: white;">🔄 Reset All Matches</button>
                 </div>
-                <div class="action-buttons" style="margin-top: 1rem; padding-top: 1rem; border-top: 2px solid rgba(102,126,234,0.2);">
-                    <button class="btn btn-secondary" id="toggleV41Btn" style="background: #9c27b0; color: white;">🧪 Toggle V4.1 Scoring</button>
-                    <button class="btn btn-secondary" id="setRolloutBtn" style="background: #673ab7; color: white;">🎚️ Set V4.1 Rollout %</button>
-                    <button class="btn btn-secondary" id="viewABBtn" style="background: #3f51b5; color: white;">📈 View A/B Stats</button>
-                </div>
             </div>
 
             <div class="action-buttons" style="margin-top: 2rem;">
@@ -442,83 +437,6 @@
             } finally {
                 btn.disabled = false;
                 btn.textContent = '🔄 Reset All Matches';
-            }
-        });
-
-        // V4.1 Feature Flags - Toggle
-        document.getElementById('toggleV41Btn').addEventListener('click', async () => {
-            const enable = confirm('Enable V4.1 scoring for A/B testing?\n\nOK = Enable\nCancel = Disable');
-
-            try {
-                const response = await fetch('/api/admin/feature-flags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enable_v4_1: enable })
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(`V4.1 Scoring ${enable ? 'ENABLED' : 'DISABLED'}\n\nCurrent config:\n- Enabled: ${result.config.enabled}\n- Rollout: ${result.config.rollout_percent}%`);
-                } else {
-                    throw new Error('Failed to update feature flags');
-                }
-            } catch (error) {
-                alert('Error updating feature flags: ' + error.message);
-            }
-        });
-
-        // V4.1 Feature Flags - Set Rollout Percentage
-        document.getElementById('setRolloutBtn').addEventListener('click', async () => {
-            const input = prompt('Set V4.1 rollout percentage (0-100):', '0');
-            if (input === null) return; // User cancelled
-
-            const pct = parseInt(input, 10);
-            if (isNaN(pct) || pct < 0 || pct > 100) {
-                alert('Please enter a valid number between 0 and 100');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/admin/feature-flags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rollout_percent: pct })
-                });
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(`V4.1 Rollout set to ${pct}%\n\nCurrent config:\n- Enabled: ${result.config.enabled}\n- Rollout: ${result.config.rollout_percent}%`);
-                } else {
-                    throw new Error('Failed to update rollout percentage');
-                }
-            } catch (error) {
-                alert('Error updating rollout percentage: ' + error.message);
-            }
-        });
-
-        // V4.1 A/B Stats - View Statistics
-        document.getElementById('viewABBtn').addEventListener('click', async () => {
-            try {
-                const response = await fetch('/api/admin/ab-stats');
-                const stats = await response.json();
-
-                if (stats.count === 0) {
-                    alert('No A/B comparison data available yet.\n\nV4.1 scoring must be enabled and matches must be generated to collect comparison data.');
-                    return;
-                }
-
-                alert(`V4.1 A/B Testing Statistics\n\n` +
-                    `Sample Size: ${stats.count} comparisons\n\n` +
-                    `Average Legacy Score: ${stats.avg_legacy}\n` +
-                    `Average V4.1 Score: ${stats.avg_v4}\n` +
-                    `Average Difference: ${stats.avg_diff}\n` +
-                    `Std Dev of Difference: ${stats.std_diff}\n` +
-                    `Correlation: ${stats.corr}\n\n` +
-                    `Higher correlation (closer to 1.0) indicates V4.1 produces similar scores to legacy system.\n` +
-                    `Lower std dev indicates more consistent score differences.`
-                );
-            } catch (error) {
-                alert('Error fetching A/B stats: ' + error.message);
             }
         });
 

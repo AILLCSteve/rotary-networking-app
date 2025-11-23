@@ -664,7 +664,7 @@
 
                 // BUILD FULL V2 LEGACY FORMAT - NO OLD FORMAT CODE
                 let cardHTML = `
-                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="toggleMatchExpansion(${matchIndex}, '${containerId}')">
+                <div class="match-card v2-format compact" id="match-${matchIndex}" data-container="${containerId}" onclick="safeToggleMatch(event, ${matchIndex}, '${containerId}')">
                     <!-- Clickable compact area -->
                     <div class="compact-clickable-area">
                         <!-- HEADER -->
@@ -735,27 +735,7 @@
                             </div>
                         </div>
 
-                        <!-- Row 4: V4.1 Confidence Band + Contribution Waterfall -->
-                        <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('confidenceBand-${matchIndex}', 'Score Confidence Band')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Score Confidence Band</h4>
-                                <canvas id="confidenceBand-${matchIndex}" width="400" height="220"></canvas>
-                            </div>
-                            <div class="radar-container" onclick="event.stopPropagation(); openVisualizationPopup('contribWaterfall-${matchIndex}', 'Contribution Waterfall')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Contribution Waterfall</h4>
-                                <canvas id="contribWaterfall-${matchIndex}" width="400" height="220"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Row 5: V4.1 Cohort Percentiles -->
-                        <div class="visualization-container" style="margin-top: 1.5rem;">
-                            <div class="radar-container" style="grid-column: 1 / -1;" onclick="event.stopPropagation(); openVisualizationPopup('percentileStrip-${matchIndex}', 'Cohort Percentiles')">
-                                <h4 style="text-align: center; margin-bottom: 1rem; color: #4facfe;">Cohort Percentiles</h4>
-                                <canvas id="percentileStrip-${matchIndex}" height="160"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Key Opportunities (moved from Match Strengths) -->
+                        <!-- Key Opportunities -->
                         ${scoreData.scoring?.dimension_scores ? `
                         <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border-left: 4px solid #10b981;">
                             <h5 style="color: #00f2fe; margin-bottom: 1rem; font-size: 1.1rem;">💡 Key Strategic Opportunities</h5>
@@ -793,10 +773,22 @@
                             </div>
                             ${scoreData.synthesis?.top_5_opportunities && scoreData.synthesis.top_5_opportunities.length > 0 ? `
                             <div class="opportunities-section">
-                                <h4>Top 5 Strategic Opportunities:</h4>
-                                <ul class="opportunities-list">
-                                    ${scoreData.synthesis.top_5_opportunities.map(opp => `<li>${opp}</li>`).join('')}
-                                </ul>
+                                <h4>Top 5 Strategic Opportunities <span style="font-size: 0.8rem; opacity: 0.7;">(click for deep analysis)</span>:</h4>
+                                <div class="opportunities-grid" style="display: grid; gap: 1rem; margin-top: 1rem;">
+                                    ${scoreData.synthesis.top_5_opportunities.map((opp, oppIndex) => `
+                                        <div class="opportunity-card"
+                                             onclick="event.stopPropagation(); analyzeOpportunity('${match.member_id}', '${match.name}', '${match.org}', ${oppIndex}, \`${opp.replace(/`/g, "'").replace(/\\/g, "\\\\")}\`)"
+                                             style="padding: 1rem; background: rgba(79, 172, 254, 0.08); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                                            <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                                                <span style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">${oppIndex + 1}</span>
+                                                <div style="flex: 1;">
+                                                    <div style="font-size: 0.95rem; line-height: 1.5;">${opp}</div>
+                                                    <div style="margin-top: 0.5rem; font-size: 0.75rem; color: #4facfe; opacity: 0.8;">🔍 Click to explore with AI</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
                             ` : ''}
                         </div>
@@ -823,13 +815,18 @@
                         ` : ''}
                     </div>
 
-                    <!-- LAYER 1: INTELLIGENCE -->
+                    <!-- LAYER 1: INTELLIGENCE (collapsed by default) -->
                     <div class="layer-section layer-1">
-                        <h3 class="layer-title">🔍 LAYER 1: Intelligence Gathered</h3>
-                        <div class="intelligence-data">
+                        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="event.stopPropagation(); toggleLayer1(${matchIndex})">
+                            <h3 class="layer-title" style="margin-bottom: 0;">🔍 LAYER 1: Intelligence Gathered</h3>
+                            <button class="layer5-toggle-btn" id="layer1ToggleBtn-${matchIndex}" style="font-size: 0.85rem; padding: 0.4rem 1rem;">
+                                📂 Show Raw Data
+                            </button>
+                        </div>
+                        <div class="intelligence-data" id="layer1Content-${matchIndex}" style="max-height: 0; overflow: hidden; opacity: 0; transition: all 0.3s ease; margin-top: 0;">
                             ${scoreData.intelligence ? `
-                            <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; color: rgba(255,255,255,0.9);">${JSON.stringify(scoreData.intelligence, null, 2)}</pre>
-                            ` : '<p style="opacity: 0.7;">No intelligence data available for this match.</p>'}
+                            <pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; color: rgba(255,255,255,0.9); margin-top: 1rem;">${JSON.stringify(scoreData.intelligence, null, 2)}</pre>
+                            ` : '<p style="opacity: 0.7; margin-top: 1rem;">No intelligence data available for this match.</p>'}
                         </div>
                     </div>
 
@@ -869,10 +866,6 @@
                         renderOpportunityTiming(matchIndex, scoreData.agent_outputs, scoreData.scoring);
                         renderValueExchange(matchIndex, scoreData.agent_outputs);
                         renderMatchStrengths(matchIndex, scoreData.synthesis, scoreData.scoring, scoreData.agent_outputs);
-                        // V4.1 Visualizations
-                        renderConfidenceBand(matchIndex, scoreData.scoring);
-                        renderContributionWaterfall(matchIndex, scoreData.scoring);
-                        renderPercentileStrip(matchIndex, scoreData.scoring);
                         renderAgentOutputs(matchIndex, scoreData.agent_outputs);
                     } else {
                         console.warn(`Match ${matchIndex} missing scoreData or scoring:`, {
@@ -1265,8 +1258,8 @@
                         <div style="margin-bottom: 1.25rem;">
                             <h5 style="color: #10b981; margin-bottom: 0.5rem; font-size: 0.9rem;">💬 Conversation Starters</h5>
                             ${topStarters.map(starter => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(16, 185, 129, 0.15); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
-                                    "${starter.length > 120 ? starter.substring(0, 120) + '...' : starter}"
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.15); border-left: 3px solid #10b981; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                    "${starter}"
                                 </div>
                             `).join('')}
                         </div>
@@ -1276,8 +1269,8 @@
                         <div style="margin-bottom: 1.25rem;">
                             <h5 style="color: #4facfe; margin-bottom: 0.5rem; font-size: 0.9rem;">⚡ Quick Actions</h5>
                             ${topActions.map(action => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(79, 172, 254, 0.15); border-left: 3px solid #4facfe; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
-                                    ${action.length > 120 ? action.substring(0, 120) + '...' : action}
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(79, 172, 254, 0.15); border-left: 3px solid #4facfe; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                    ${action}
                                 </div>
                             `).join('')}
                         </div>
@@ -1287,8 +1280,8 @@
                         <div>
                             <h5 style="color: #00f2fe; margin-bottom: 0.5rem; font-size: 0.9rem;">🎯 Top Opportunities</h5>
                             ${topOpportunities.map((opp, i) => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.6rem; background: rgba(0, 242, 254, 0.1); border-left: 3px solid #00f2fe; border-radius: 6px; font-size: 0.85rem; line-height: 1.4;">
-                                    <strong>#${i + 1}:</strong> ${opp.length > 100 ? opp.substring(0, 100) + '...' : opp}
+                                <div style="margin-bottom: 0.5rem; padding: 0.75rem; background: rgba(0, 242, 254, 0.1); border-left: 3px solid #00f2fe; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+                                    <strong>#${i + 1}:</strong> ${opp}
                                 </div>
                             `).join('')}
                         </div>
@@ -1339,174 +1332,6 @@
         }
 
         // ==============================================
-        // V4.1 VISUALIZATION FUNCTIONS
-        // ==============================================
-
-        function as100(x) {
-            return (typeof x === 'number' && isFinite(x)) ? Math.max(0, Math.min(100, x)) : 0;
-        }
-
-        function getDims(scoring) {
-            const d = scoring?.dimension_scores || {};
-            return [
-                as100(d.strategic_synergy),
-                as100(d.tactical_value),
-                as100(d.innovation_potential),
-                as100(d.risk_compatibility),
-                as100(d.network_effects),
-                as100(d.temporal_urgency)
-            ];
-        }
-
-        function renderConfidenceBand(matchIndex, scoring) {
-            const el = document.getElementById(`confidenceBand-${matchIndex}`);
-            if (!el || !window.Chart) return;
-
-            const base = as100(scoring?.base_score);
-            const final = as100(scoring?.final_score || scoring?.score);
-            const ci = scoring?.variance?.model_ci95;
-            const low = as100(ci?.[0]);
-            const high = as100(ci?.[1]);
-
-            // Skip if nothing to show
-            if (!final && !base && !ci) return;
-
-            const labels = ['Base Model', 'Final Score'];
-            const values = [base || final, final];
-
-            try {
-                new Chart(el, {
-                    type: 'line',
-                    data: {
-                        labels,
-                        datasets: [
-                            ci ? {
-                                label: 'CI Low',
-                                data: [low, low],
-                                fill: '+1',
-                                borderWidth: 0,
-                                backgroundColor: 'rgba(79,172,254,0.15)'
-                            } : null,
-                            ci ? {
-                                label: 'CI High',
-                                data: [high, high],
-                                borderWidth: 0
-                            } : null,
-                            {
-                                label: 'Score',
-                                data: values,
-                                borderColor: '#4facfe',
-                                backgroundColor: 'rgba(79,172,254,0.3)',
-                                borderWidth: 3,
-                                tension: 0.3
-                            }
-                        ].filter(Boolean)
-                    },
-                    options: {
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: {
-                                min: 0,
-                                max: 100,
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                ticks: { color: 'rgba(255,255,255,0.7)' }
-                            },
-                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error(`Error rendering confidence band for match ${matchIndex}:`, error);
-            }
-        }
-
-        function renderContributionWaterfall(matchIndex, scoring) {
-            const el = document.getElementById(`contribWaterfall-${matchIndex}`);
-            if (!el || !window.Chart) return;
-
-            const d = scoring?.dimension_scores || {};
-            const w = { S: 0.25, T: 0.20, I: 0.20, R: 0.15, N: 0.15, U: 0.05 };
-            const vals = {
-                S: w.S * as100(d.strategic_synergy),
-                T: w.T * as100(d.tactical_value),
-                I: w.I * as100(d.innovation_potential),
-                R: w.R * as100(d.risk_compatibility),
-                N: w.N * as100(d.network_effects),
-                U: w.U * as100(d.temporal_urgency)
-            };
-
-            try {
-                new Chart(el, {
-                    type: 'bar',
-                    data: {
-                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
-                        datasets: [{
-                            data: Object.values(vals),
-                            backgroundColor: [
-                                'rgba(79,172,254,0.8)',
-                                'rgba(0,242,254,0.8)',
-                                'rgba(102,126,234,0.8)',
-                                'rgba(118,75,162,0.8)',
-                                'rgba(237,66,100,0.8)',
-                                'rgba(255,159,64,0.8)'
-                            ]
-                        }]
-                    },
-                    options: {
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 100,
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                ticks: { color: 'rgba(255,255,255,0.7)' }
-                            },
-                            x: { ticks: { color: 'rgba(255,255,255,0.9)' } }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error(`Error rendering contribution waterfall for match ${matchIndex}:`, error);
-            }
-        }
-
-        function renderPercentileStrip(matchIndex, scoring) {
-            const el = document.getElementById(`percentileStrip-${matchIndex}`);
-            if (!el || !window.Chart) return;
-
-            const dims = scoring?.dimension_scores ? getDims(scoring) : null;
-            if (!dims) return;
-
-            try {
-                new Chart(el, {
-                    type: 'bar',
-                    data: {
-                        labels: ['S', 'T', 'I', 'R', 'N', 'U'],
-                        datasets: [{
-                            data: dims,
-                            backgroundColor: 'rgba(79,172,254,0.8)'
-                        }]
-                    },
-                    options: {
-                        indexAxis: 'y',
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            x: {
-                                min: 0,
-                                max: 100,
-                                grid: { color: 'rgba(255,255,255,0.1)' },
-                                ticks: { color: 'rgba(255,255,255,0.7)' }
-                            },
-                            y: { ticks: { color: 'rgba(255,255,255,0.9)' } }
-                        }
-                    }
-                });
-            } catch (error) {
-                console.error(`Error rendering percentile strip for match ${matchIndex}:`, error);
-            }
-        }
-
-        // ==============================================
 
         function renderAgentOutputs(matchIndex, agentOutputs) {
             const grid = document.getElementById(`agentGrid-${matchIndex}`);
@@ -1521,66 +1346,69 @@
 
             console.log(`Rendering agent outputs for match ${matchIndex}`);
 
-            // Helper to safely extract display text from any value (never show JSON)
-            function safeDisplayValue(val, maxLen = 150) {
+            // Helper to safely extract and format display text - NO TRUNCATION
+            function formatFieldValue(val) {
                 if (val === null || val === undefined) return '';
-                if (typeof val === 'string') return val.substring(0, maxLen);
+                if (typeof val === 'string') return val;
                 if (Array.isArray(val)) {
-                    // Join array items with bullets, truncate each
-                    return val.slice(0, 3).map(item => {
-                        if (typeof item === 'string') return item.substring(0, 80);
+                    // Show each item as a separate list entry - full text
+                    const items = val.slice(0, 4).map(item => {
+                        if (typeof item === 'string') return item;
                         if (typeof item === 'object' && item !== null) {
-                            // Extract first string value from object
+                            // Extract meaningful text from object
+                            const text = item.description || item.text || item.value || item.idea || item.action || item.starter || item.opportunity;
+                            if (text) return text;
+                            // Fallback: first string value
                             for (const v of Object.values(item)) {
-                                if (typeof v === 'string') return v.substring(0, 80);
+                                if (typeof v === 'string' && v.length > 10) return v;
                             }
                         }
                         return '';
-                    }).filter(x => x).join(' • ');
+                    }).filter(x => x);
+                    return items;
                 }
                 return '';
             }
 
             const agentData = [
                 { name: 'Business Synergy', key: 'business_synergy', scoreKey: 'synergy_score', icon: '💼',
-                  priorityFields: ['direct_value_exchanges', 'asset_need_matches', 'quantifiable_benefits'] },
+                  priorityFields: ['direct_value_exchanges', 'asset_need_matches', 'quantifiable_benefits', 'resource_sharing_opportunities'] },
                 { name: 'Creative Collaboration', key: 'creative_collaboration', scoreKey: 'creativity_score', icon: '✨',
-                  priorityFields: ['co_creation_ideas', 'unexpected_synergies', 'innovation_potential'] },
+                  priorityFields: ['co_creation_ideas', 'unexpected_synergies', 'innovation_potential', 'network_multiplication'] },
                 { name: 'Risk & Compatibility', key: 'risk_compatibility', scoreKey: 'compatibility_score', icon: '⚖️',
-                  priorityFields: ['cultural_fit', 'competitive_conflicts', 'red_flags'] },
+                  priorityFields: ['cultural_fit', 'competitive_conflicts', 'red_flags', 'compatibility_notes'] },
                 { name: 'Strategic Growth', key: 'strategic_growth', scoreKey: 'strategic_score', icon: '📈',
-                  priorityFields: ['market_expansion_opportunities', 'strategic_positioning', 'growth_multipliers'] },
+                  priorityFields: ['market_expansion_opportunities', 'strategic_positioning', 'growth_multipliers', 'long_term_vision'] },
                 { name: 'Tactical Connection', key: 'tactical_connection', scoreKey: 'tactical_score', icon: '🎯',
-                  priorityFields: ['conversation_starters', 'immediate_actions', 'meeting_format'] }
+                  priorityFields: ['conversation_starters', 'immediate_actions', 'meeting_format', 'next_steps'] }
             ];
 
             const renderedCards = agentData.map(agent => {
                 const data = agentOutputs[agent.key];
                 if (!data) return '';
 
-                // Extract meaningful fields in priority order
+                // Extract ALL meaningful fields (not just 2)
                 const insights = [];
                 for (const field of agent.priorityFields) {
                     if (data[field]) {
-                        const displayVal = safeDisplayValue(data[field]);
-                        if (displayVal && displayVal.length > 5) {
+                        const displayVal = formatFieldValue(data[field]);
+                        if (displayVal && (typeof displayVal === 'string' ? displayVal.length > 5 : displayVal.length > 0)) {
                             const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            insights.push({ label, value: displayVal });
+                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal) });
                         }
                     }
-                    if (insights.length >= 2) break;
                 }
 
-                // If no priority fields found, try any string/array fields
-                if (insights.length === 0) {
+                // Also try other fields if we have space
+                if (insights.length < 3) {
                     for (const [key, val] of Object.entries(data)) {
-                        if (key.includes('score') || key === 'confidence') continue;
-                        const displayVal = safeDisplayValue(val);
-                        if (displayVal && displayVal.length > 5) {
+                        if (key.includes('score') || key === 'confidence' || agent.priorityFields.includes(key)) continue;
+                        const displayVal = formatFieldValue(val);
+                        if (displayVal && (typeof displayVal === 'string' ? displayVal.length > 10 : displayVal.length > 0)) {
                             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            insights.push({ label, value: displayVal });
+                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal) });
                         }
-                        if (insights.length >= 2) break;
+                        if (insights.length >= 4) break;
                     }
                 }
 
@@ -1594,11 +1422,15 @@
                             <div style="font-size: 1.1rem; font-weight: 700; color: ${scoreColor};">${score || 'N/A'}<span style="font-size: 0.75rem; opacity: 0.7;">/100</span></div>
                         </div>
                         ${data.confidence ? `<div style="font-size: 0.8rem; opacity: 0.6; margin-bottom: 0.5rem;">Confidence: ${Math.round(data.confidence)}%</div>` : ''}
-                        <div style="font-size: 0.85rem; line-height: 1.5;">
+                        <div style="font-size: 0.85rem; line-height: 1.6;">
                             ${insights.map(insight => `
-                                <div style="margin-bottom: 0.6rem;">
-                                    <strong style="color: #4facfe; font-size: 0.8rem;">${insight.label}:</strong>
-                                    <div style="opacity: 0.9; margin-top: 0.15rem;">${insight.value}</div>
+                                <div style="margin-bottom: 1rem;">
+                                    <strong style="color: #4facfe; font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">${insight.label}:</strong>
+                                    ${insight.isArray ? `
+                                        <ul style="margin: 0; padding-left: 1.2rem; opacity: 0.9;">
+                                            ${insight.value.map(item => `<li style="margin-bottom: 0.4rem;">${item}</li>`).join('')}
+                                        </ul>
+                                    ` : `<div style="opacity: 0.9;">${insight.value}</div>`}
                                 </div>
                             `).join('')}
                             ${insights.length === 0 ? '<div style="opacity: 0.6; font-style: italic;">Analysis complete - see score above</div>' : ''}
@@ -1613,6 +1445,48 @@
         // ==============================================
         // CLICK-TO-EXPAND FUNCTIONALITY
         // ==============================================
+
+        // Track touch/scroll state to prevent ghost clicks
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let lastClickTime = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+        }, { passive: true });
+
+        // Safe toggle that filters out scroll-triggered clicks
+        function safeToggleMatch(event, matchIndex, containerId) {
+            // Prevent double-click issues
+            const now = Date.now();
+            if (now - lastClickTime < 300) {
+                return; // Ignore rapid clicks
+            }
+            lastClickTime = now;
+
+            // Check if this came from a touch event that moved (scroll)
+            if (event.type === 'click' && touchStartTime > 0) {
+                const timeSinceTouch = now - touchStartTime;
+                // If it's been a while since touch started, likely a scroll-then-click
+                if (timeSinceTouch > 500) {
+                    touchStartTime = 0;
+                    return; // Likely a scroll ghost click
+                }
+            }
+
+            // Check if the click target is an interactive element that should NOT trigger expansion
+            const target = event.target;
+            const tagName = target.tagName.toLowerCase();
+            if (tagName === 'button' || tagName === 'a' || tagName === 'canvas' ||
+                target.closest('button') || target.closest('a') || target.closest('canvas') ||
+                target.closest('.opportunity-card') || target.closest('.layer5-toggle-btn')) {
+                return; // Don't toggle when clicking interactive elements
+            }
+
+            // Safe to toggle
+            toggleMatchExpansion(matchIndex, containerId);
+        }
 
         function toggleMatchExpansion(matchIndex, containerId) {
             const clickedCard = document.getElementById(`match-${matchIndex}`);
@@ -1720,6 +1594,108 @@
                 visualsContent.classList.remove('expanded');
                 toggleBtn.innerHTML = '📊 Open Visuals';
                 toggleBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+            }
+        }
+
+        // ==============================================
+        // LAYER 1 TOGGLE FUNCTIONALITY
+        // ==============================================
+
+        function toggleLayer1(matchIndex) {
+            const content = document.getElementById(`layer1Content-${matchIndex}`);
+            const toggleBtn = document.getElementById(`layer1ToggleBtn-${matchIndex}`);
+
+            if (content.style.maxHeight === '0px' || content.style.maxHeight === '') {
+                // Expand
+                content.style.maxHeight = '2000px';
+                content.style.opacity = '1';
+                content.style.marginTop = '1rem';
+                toggleBtn.innerHTML = '✕ Hide Raw Data';
+                toggleBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+            } else {
+                // Collapse
+                content.style.maxHeight = '0px';
+                content.style.opacity = '0';
+                content.style.marginTop = '0';
+                toggleBtn.innerHTML = '📂 Show Raw Data';
+                toggleBtn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+            }
+        }
+
+        // ==============================================
+        // OPPORTUNITY DEEP ANALYSIS
+        // ==============================================
+
+        async function analyzeOpportunity(matchMemberId, matchName, matchOrg, oppIndex, opportunityText) {
+            const overlay = document.getElementById('progressOverlay');
+            const progressBox = document.getElementById('progressBox');
+            const vizBox = document.getElementById('vizPopupCanvas');
+
+            // Show loading state in popup
+            progressBox.style.display = 'none';
+            vizBox.style.display = 'block';
+            vizBox.innerHTML = `
+                <div style="text-align: center; padding: 3rem;">
+                    <div class="spinner" style="width: 60px; height: 60px; margin: 0 auto 2rem;"></div>
+                    <h2 style="color: #4facfe; margin-bottom: 1rem;">🧠 Deep Analysis in Progress</h2>
+                    <p style="opacity: 0.8; max-width: 500px; margin: 0 auto;">
+                        Analyzing opportunity #${oppIndex + 1} for your connection with <strong>${matchName}</strong> at <strong>${matchOrg}</strong>...
+                    </p>
+                    <p style="opacity: 0.6; margin-top: 1rem; font-size: 0.9rem;">This typically takes 5-10 seconds</p>
+                </div>
+            `;
+            overlay.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/analyze-opportunity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        memberId: memberId,
+                        matchMemberId: matchMemberId,
+                        matchName: matchName,
+                        matchOrg: matchOrg,
+                        opportunityIndex: oppIndex,
+                        opportunityText: opportunityText
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show the analysis result
+                    vizBox.innerHTML = `
+                        <div style="max-width: 800px; margin: 0 auto; padding: 2rem;">
+                            <h2 style="color: #4facfe; margin-bottom: 0.5rem; text-align: center;">🎯 Deep Opportunity Analysis</h2>
+                            <p style="text-align: center; opacity: 0.7; margin-bottom: 2rem;">
+                                For your connection with <strong>${matchName}</strong> at <strong>${matchOrg}</strong>
+                            </p>
+
+                            <div style="background: rgba(79, 172, 254, 0.1); border: 1px solid rgba(79, 172, 254, 0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem;">
+                                <h4 style="color: #00f2fe; margin-bottom: 0.5rem;">Original Opportunity:</h4>
+                                <p style="opacity: 0.9; line-height: 1.6;">${opportunityText}</p>
+                            </div>
+
+                            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                                <h4 style="color: #10b981; margin-bottom: 1rem;">🔍 Strategic Analysis:</h4>
+                                <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">${result.analysis}</div>
+                            </div>
+
+                            <p style="text-align: center; opacity: 0.6; font-size: 0.85rem; margin-top: 2rem;">Click anywhere to close</p>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Opportunity analysis error:', error);
+                vizBox.innerHTML = `
+                    <div style="text-align: center; padding: 3rem;">
+                        <h2 style="color: #f5576c; margin-bottom: 1rem;">❌ Analysis Failed</h2>
+                        <p style="opacity: 0.8;">${error.message}</p>
+                        <p style="opacity: 0.6; margin-top: 1rem; font-size: 0.9rem;">Click anywhere to close and try again</p>
+                    </div>
+                `;
             }
         }
 
