@@ -1284,7 +1284,9 @@
                             ? `${directExchanges.length} direct value exchange${directExchanges.length > 1 ? 's' : ''} identified`
                             : (assetMatches.length > 0 ? 'Indirect revenue via asset matches' : 'Referral potential only'),
                         agentKey: 'business_synergy',
-                        agentName: 'Business Synergy'
+                        agentName: 'Business Synergy',
+                        fieldKey: 'direct_value_exchanges',
+                        fieldName: 'Direct Value Exchanges'
                     },
                     {
                         label: 'Cost Savings',
@@ -1293,7 +1295,9 @@
                             ? `${resourceOpps.length} resource sharing opportunit${resourceOpps.length > 1 ? 'ies' : 'y'}`
                             : 'Limited cost synergies found',
                         agentKey: 'business_synergy',
-                        agentName: 'Business Synergy'
+                        agentName: 'Business Synergy',
+                        fieldKey: 'resource_sharing_opportunities',
+                        fieldName: 'Resource Sharing Opportunities'
                     },
                     {
                         label: 'Network',
@@ -1302,7 +1306,9 @@
                             ? `${networkMult.length} network multiplication path${networkMult.length > 1 ? 's' : ''}`
                             : 'Standard network expansion potential',
                         agentKey: 'creative_collaboration',
-                        agentName: 'Creative Collaboration'
+                        agentName: 'Creative Collaboration',
+                        fieldKey: 'network_multiplication',
+                        fieldName: 'Network Multiplication'
                     },
                     {
                         label: 'Innovation',
@@ -1311,7 +1317,9 @@
                             ? `${coCreation.length} co-creation idea${coCreation.length > 1 ? 's' : ''} possible`
                             : 'Limited innovation alignment',
                         agentKey: 'creative_collaboration',
-                        agentName: 'Creative Collaboration'
+                        agentName: 'Creative Collaboration',
+                        fieldKey: 'co_creation_ideas',
+                        fieldName: 'Co-Creation Ideas'
                     },
                     {
                         label: 'Market Access',
@@ -1320,7 +1328,9 @@
                             ? `${growthPaths.length} market expansion path${growthPaths.length > 1 ? 's' : ''}`
                             : 'Limited market overlap found',
                         agentKey: 'strategic_growth',
-                        agentName: 'Strategic Growth'
+                        agentName: 'Strategic Growth',
+                        fieldKey: 'market_expansion_opportunities',
+                        fieldName: 'Market Expansion Opportunities'
                     }
                 ];
 
@@ -1340,6 +1350,8 @@
                                  data-match-index="${matchIndex}"
                                  data-agent-key="${cat.agentKey}"
                                  data-agent-name="${cat.agentName}"
+                                 data-field-key="${cat.fieldKey}"
+                                 data-field-name="${cat.fieldName}"
                                  style="margin-bottom: ${isMobile ? '0.6rem' : '0.8rem'}; cursor: pointer; padding: 0.5rem; border-radius: 8px; transition: background 0.2s ease;"
                                  onmouseover="this.style.background='rgba(255,255,255,0.08)'"
                                  onmouseout="this.style.background='transparent'">
@@ -1612,7 +1624,7 @@
                         const displayVal = formatFieldValue(data[field]);
                         if (displayVal && (typeof displayVal === 'string' ? displayVal.length > 5 : displayVal.length > 0)) {
                             const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal) });
+                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal), fieldKey: field });
                         }
                     }
                 }
@@ -1624,7 +1636,7 @@
                         const displayVal = formatFieldValue(val);
                         if (displayVal && (typeof displayVal === 'string' ? displayVal.length > 10 : displayVal.length > 0)) {
                             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal) });
+                            insights.push({ label, value: displayVal, isArray: Array.isArray(displayVal), fieldKey: key });
                         }
                         if (insights.length >= 4) break;
                     }
@@ -1643,7 +1655,7 @@
                         ${data.confidence ? `<div style="font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); margin-bottom: 0.5rem;">Confidence: ${Math.round(data.confidence)}%</div>` : ''}
                         <div style="font-size: 0.85rem; line-height: 1.6; color: rgba(255, 255, 255, 0.85);">
                             ${insights.map(insight => `
-                                <div style="margin-bottom: 1rem;">
+                                <div id="field-${matchIndex}-${agent.key}-${insight.fieldKey}" class="agent-field-section" style="margin-bottom: 1rem; scroll-margin-top: 100px; padding: 0.5rem; border-radius: 6px; transition: background 0.3s ease, box-shadow 0.3s ease;">
                                     <strong style="color: rgba(255, 255, 255, 0.9); text-shadow: 0 0 8px rgba(255, 255, 255, 0.2); font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">${insight.label}:</strong>
                                     ${insight.isArray ? `
                                         <ul style="margin: 0; padding-left: 1.2rem; color: rgba(255, 255, 255, 0.85);">
@@ -1787,9 +1799,11 @@
                 const matchIndex = valueMetric.dataset.matchIndex;
                 const agentKey = valueMetric.dataset.agentKey;
                 const agentName = valueMetric.dataset.agentName;
+                const fieldKey = valueMetric.dataset.fieldKey;
+                const fieldName = valueMetric.dataset.fieldName;
 
-                console.log('📊 Value metric clicked:', { matchIndex, agentKey, agentName });
-                scrollToAgentSection(matchIndex, agentKey, agentName);
+                console.log('📊 Value metric clicked:', { matchIndex, agentKey, agentName, fieldKey, fieldName });
+                scrollToAgentSection(matchIndex, agentKey, agentName, fieldKey, fieldName);
                 return;
             }
         }, true); // capture phase
@@ -1826,31 +1840,60 @@
             });
         }
 
-        // SCROLL TO AGENT SECTION in Layer 2
-        function scrollToAgentSection(matchIndex, agentKey, agentName) {
+        // SCROLL TO AGENT SECTION in Layer 2 (targets specific field sub-section)
+        function scrollToAgentSection(matchIndex, agentKey, agentName, fieldKey, fieldName) {
             // Close any open visualization popup first
             closeVisualizationPopup();
 
+            // Try to find the specific field section first
+            const fieldSection = document.getElementById(`field-${matchIndex}-${agentKey}-${fieldKey}`);
             const agentCard = document.getElementById(`agent-${matchIndex}-${agentKey}`);
-            if (!agentCard) {
-                console.warn(`Agent section not found: agent-${matchIndex}-${agentKey}`);
+
+            // Determine target element - prefer field section if it exists
+            const targetElement = fieldSection || agentCard;
+
+            if (!targetElement) {
+                console.warn(`Section not found: field-${matchIndex}-${agentKey}-${fieldKey} or agent-${matchIndex}-${agentKey}`);
                 return;
             }
 
-            // Scroll the agent card into view
-            agentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Scroll the target into view - center it on screen
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-            // Highlight effect - pulse glow
-            agentCard.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)';
-            agentCard.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+            // Highlight effect on the specific field section
+            if (fieldSection) {
+                fieldSection.style.background = 'rgba(59, 130, 246, 0.25)';
+                fieldSection.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.6), inset 0 0 10px rgba(59, 130, 246, 0.2)';
 
-            // Remove highlight after animation
-            setTimeout(() => {
-                agentCard.style.boxShadow = '';
-                agentCard.style.borderColor = 'rgba(255,255,255,0.15)';
-            }, 2000);
+                // Also highlight the parent agent card border
+                if (agentCard) {
+                    agentCard.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+                    agentCard.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.4)';
+                }
 
-            console.log(`📍 Scrolled to ${agentName} section for match ${matchIndex}`);
+                // Remove highlight after animation
+                setTimeout(() => {
+                    fieldSection.style.background = '';
+                    fieldSection.style.boxShadow = '';
+                    if (agentCard) {
+                        agentCard.style.borderColor = 'rgba(255,255,255,0.15)';
+                        agentCard.style.boxShadow = '';
+                    }
+                }, 2500);
+
+                console.log(`📍 Scrolled to ${fieldName} in ${agentName} for match ${matchIndex}`);
+            } else {
+                // Fallback: just highlight the agent card
+                agentCard.style.boxShadow = '0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)';
+                agentCard.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+
+                setTimeout(() => {
+                    agentCard.style.boxShadow = '';
+                    agentCard.style.borderColor = 'rgba(255,255,255,0.15)';
+                }, 2000);
+
+                console.log(`📍 Scrolled to ${agentName} section for match ${matchIndex}`);
+            }
         }
 
         // ==============================================
@@ -1947,7 +1990,9 @@
                     const matchIndex = metric.dataset.matchIndex;
                     const agentKey = metric.dataset.agentKey;
                     const agentName = metric.dataset.agentName;
-                    scrollToAgentSection(matchIndex, agentKey, agentName);
+                    const fieldKey = metric.dataset.fieldKey;
+                    const fieldName = metric.dataset.fieldName;
+                    scrollToAgentSection(matchIndex, agentKey, agentName, fieldKey, fieldName);
                 });
             });
 
