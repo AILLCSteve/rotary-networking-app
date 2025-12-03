@@ -973,17 +973,49 @@ function analyzeCommunicationStyle(memberText) {
   };
 }
 
-// Generate embedding for a member
+// ============================================================================
+// SAVE WEB RESEARCH TO DATABASE
+// ============================================================================
+async function saveCompanyResearch(memberId, companyData, industryData, sources) {
+  try {
+    await db.run(`
+      INSERT INTO company_research (member_id, company_summary, industry_trends, web_sources, last_updated)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+      ON CONFLICT (member_id)
+      DO UPDATE SET
+        company_summary = $2,
+        industry_trends = $3,
+        web_sources = $4,
+        last_updated = CURRENT_TIMESTAMP
+    `, [
+      memberId,
+      companyData?.summary || null,
+      industryData?.summary || null,
+      JSON.stringify(sources || [])
+    ]);
+
+    console.log(`   💾 Saved web research for member ${memberId}`);
+  } catch (error) {
+    console.error(`   ⚠️  Could not save research for ${memberId}:`, error.message);
+  }
+}
+
+// ============================================================================
+// GENERATE EMBEDDING (NOW WITH WEB RESEARCH ENHANCEMENT)
+// ============================================================================
 async function generateEmbedding(memberId) {
   try {
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
+
+    // Check for web research data
+    const research = await db.get('SELECT * FROM company_research WHERE member_id = $1', [memberId]);
 
     // ENHANCEMENT: Analyze communication style
     const fullText = `${member.rev_driver} ${member.current_constraint} ${member.assets} ${member.needs} ${member.fun_fact}`;
     const commStyle = analyzeCommunicationStyle(fullText);
 
     // Build RICH profile string for embedding - include everything for better semantic matching
-    const profile = `
+    let profile = `
       ${member.name} | ${member.role} at ${member.org}
       Industry: ${member.industry || ''} | Location: ${member.city || ''}
       Revenue Model: ${member.rev_driver || ''}
@@ -994,9 +1026,21 @@ async function generateEmbedding(memberId) {
       Communication Style: ${commStyle.primary_style}
     `.trim();
 
+    // ENHANCEMENT: Add verified web research if available
+    if (research && research.company_summary) {
+      profile += `\n\nVerified Company Information: ${research.company_summary}`;
+    }
+
+    if (research && research.industry_trends) {
+      profile += `\n\nIndustry Context: ${research.industry_trends}`;
+    }
+
+    const embeddingType = research ? 'web-enhanced' : 'profile-only';
+    console.log(`   🧬 Generating ${embeddingType} embedding for ${member.name}...`);
+
     // Generate embedding using OpenAI
     const response = await openai.embeddings.create({
-      model: 'text-embedding-3-small', // Using smaller model for cost efficiency
+      model: 'text-embedding-3-small',
       input: profile
     });
 
@@ -1018,7 +1062,7 @@ async function generateEmbedding(memberId) {
       // Column might not exist yet, that's okay
     }
 
-    console.log(`✅ Embedding generated for ${member.name} (${member.org}) - Style: ${commStyle.primary_style}`);
+    console.log(`✅ ${embeddingType} embedding generated for ${member.name} (${member.org})`);
   } catch (error) {
     console.error('Embedding generation error:', error);
   }

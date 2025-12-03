@@ -35,6 +35,71 @@ const openai = new OpenAI({
 const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 // ============================================================================
+// HELPER: Save research and regenerate embedding with web data
+// ============================================================================
+async function saveCompanyResearchAndRegenerateEmbedding(memberId, companyData, industryData, sources) {
+  try {
+    // Save research to database
+    await db.run(`
+      INSERT INTO company_research (member_id, company_summary, industry_trends, web_sources, last_updated)
+      VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+      ON CONFLICT (member_id)
+      DO UPDATE SET
+        company_summary = $2,
+        industry_trends = $3,
+        web_sources = $4,
+        last_updated = CURRENT_TIMESTAMP
+    `, [
+      memberId,
+      companyData?.summary || null,
+      industryData?.summary || null,
+      JSON.stringify(sources || [])
+    ]);
+
+    console.log(`   💾 Saved research for ${memberId}, regenerating web-enhanced embedding...`);
+
+    // Trigger embedding regeneration (will now include web research)
+    const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
+    if (member) {
+      const research = await db.get('SELECT * FROM company_research WHERE member_id = $1', [memberId]);
+
+      // Build enhanced profile with web research
+      let profile = `
+        ${member.name} | ${member.role} at ${member.org}
+        Industry: ${member.industry || ''} | Location: ${member.city || ''}
+        Revenue Model: ${member.rev_driver || ''}
+        What I Bring: ${member.assets || ''}
+        What I Need: ${member.needs || ''}
+      `.trim();
+
+      if (research?.company_summary) {
+        profile += `\n\nVerified Company Information: ${research.company_summary}`;
+      }
+      if (research?.industry_trends) {
+        profile += `\n\nIndustry Context: ${research.industry_trends}`;
+      }
+
+      // Generate web-enhanced embedding
+      const response = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: profile
+      });
+
+      // Update embedding
+      await db.run(`
+        INSERT INTO vectors (member_id, embedding_ops)
+        VALUES ($1, $2)
+        ON CONFLICT (member_id) DO UPDATE SET embedding_ops = $2
+      `, [memberId, JSON.stringify(response.data[0].embedding)]);
+
+      console.log(`   ✅ Web-enhanced embedding generated for ${member.name}`);
+    }
+  } catch (error) {
+    console.error(`   ⚠️  Failed to save research/regenerate embedding for ${memberId}:`, error.message);
+  }
+}
+
+// ============================================================================
 // PRODUCTION MATCH GENERATION (V3.5+ Engine + V2 Output Format)
 // ============================================================================
 
@@ -175,6 +240,15 @@ async function gatherIntelligence(member1, member2) {
     ...(member2Research?.sources || []),
     ...(industryResearch?.sources || [])
   ];
+
+  // CRITICAL: Save research to database for embedding enhancement
+  // This happens async - don't await to avoid blocking
+  if (member1Research) {
+    saveCompanyResearchAndRegenerateEmbedding(member1.member_id, member1Research, industryResearch, member1Research.sources);
+  }
+  if (member2Research) {
+    saveCompanyResearchAndRegenerateEmbedding(member2.member_id, member2Research, industryResearch, member2Research.sources);
+  }
 
   return {
     // Company research with sources
