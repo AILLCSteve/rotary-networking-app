@@ -8,6 +8,7 @@ This AI-powered networking app matches Rotary club members using OpenAI embeddin
 - Backend: Node.js + Express
 - Database: PostgreSQL (Neon)
 - AI: OpenAI API (embeddings + GPT-4o/GPT-3.5-turbo)
+- Web Research: Tavily AI Search (real-time company/industry data)
 - Hosting: Render (Web Service)
 
 ---
@@ -15,9 +16,10 @@ This AI-powered networking app matches Rotary club members using OpenAI embeddin
 ## Prerequisites
 
 1. **OpenAI API Key** - Get from https://platform.openai.com/api-keys
-2. **Neon Postgres Database** - Sign up at https://neon.tech
-3. **Render Account** - Sign up at https://render.com (paid plan recommended for no cold starts)
-4. **GitHub Account** - For deploying from repository
+2. **Tavily API Key** - Get from https://tavily.com (for real web research)
+3. **Neon Postgres Database** - Sign up at https://neon.tech
+4. **Render Account** - Sign up at https://render.com (paid plan recommended for no cold starts)
+5. **GitHub Account** - For deploying from repository
 
 ---
 
@@ -84,10 +86,17 @@ In the Render dashboard, go to **Environment** and add:
 
 ```
 OPENAI_API_KEY=sk-proj-...your-actual-key...
+TAVILY_API_KEY=tvly-...your-actual-key...
 DATABASE_URL=postgresql://...your-neon-connection-string...
 SESSION_SECRET=generate-a-random-string-here
 NODE_ENV=production
 ```
+
+**REQUIRED API Keys:**
+- `OPENAI_API_KEY`: Get from https://platform.openai.com/api-keys
+- `TAVILY_API_KEY`: Get from https://tavily.com (for real web research)
+  - Used to fetch actual company news and industry trends
+  - Prevents AI hallucination in match analysis
 
 **Generate a strong SESSION_SECRET:**
 ```bash
@@ -189,12 +198,14 @@ User Browser
 Render Web Service (Express)
     ↓
     ├─→ OpenAI API (Embeddings + GPT-4)
+    ├─→ Tavily API (Real web research)
     └─→ Neon Postgres DB
 ```
 
 ### Key Features
 
 - **AI-Powered Matching:** Uses text-embedding-3-small for semantic similarity
+- **Real Web Research:** Tavily API fetches actual company news and industry trends (no hallucination)
 - **Smart Scoring:** 100-point system combining:
   - Semantic similarity (40 pts)
   - Complementary needs/assets (30 pts)
@@ -202,7 +213,7 @@ Render Web Service (Express)
   - Industry synergy (10 pts)
   - Constraint alignment (5 pts)
 - **GPT-4 Rationales:** Top 3 matches use GPT-4o for highest quality
-- **GPT-3.5 Brainstorm:** Broader matches use GPT-3.5-turbo for speed
+- **Evidence-Based Analysis:** All claims verified against web sources or member profiles
 - **Real-time Admin Dashboard:** Monitor registrations and matches live
 
 ---
@@ -239,6 +250,10 @@ Render Web Service (Express)
   - Embeddings: ~$0.0001 per member
   - GPT-4o rationales: ~$0.01-0.02 per match
   - Total for 20 members: ~$2-5
+- **Tavily:**
+  - Free tier: 1,000 searches/month (sufficient for demo)
+  - Searches: ~4-6 per match (company news + industry trends)
+  - Total for 20 members: ~100-200 searches (well within free tier)
 
 ---
 
