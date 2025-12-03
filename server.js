@@ -5,6 +5,7 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const OpenAI = require('openai');
+const { tavily } = require('@tavily/core');
 const crypto = require('crypto');
 const db = require('./db');
 const nexusV2 = require('./nexus-v2');
@@ -18,6 +19,9 @@ const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Tavily client for web search
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 // Middleware
 app.use(express.json());
@@ -806,6 +810,111 @@ function calculateMatchScore(member1, member2, similarity, complementaryValueRes
       grade: overallPercentage >= 85 ? 'A+' : overallPercentage >= 75 ? 'A' : overallPercentage >= 65 ? 'B+' : overallPercentage >= 55 ? 'B' : 'C+'
     }
   };
+}
+
+// ============================================================================
+// STAGE 0: Complementary Value Research with WEB SEARCH (RESTORED)
+// ============================================================================
+async function researchComplementaryValue(member1, member2) {
+  try {
+    console.log(`   🔬 Researching complementary value: ${member1.org} ↔ ${member2.org}`);
+
+    // Web search for collaboration opportunities
+    const searchQuery = `${member1.org} ${member1.industry} ${member2.org} ${member2.industry} partnership collaboration opportunities`;
+
+    let webContext = '';
+    let sources = [];
+
+    try {
+      const searchResults = await tavilyClient.search(searchQuery, {
+        maxResults: 2,
+        searchDepth: 'basic'
+      });
+
+      if (searchResults.results && searchResults.results.length > 0) {
+        webContext = searchResults.results.map((r, i) =>
+          `[Web Source ${i + 1}] ${r.title}: ${r.content}`
+        ).join('\n\n');
+        sources = searchResults.results.map(r => ({ title: r.title, url: r.url }));
+        console.log(`   ✅ Found ${sources.length} web sources for collaboration research`);
+      }
+    } catch (searchError) {
+      console.log(`   ⚠️  Web search unavailable, using profile data only:`, searchError.message);
+    }
+
+    const systemPrompt = `You are a creative business collaboration strategist specializing in discovering value exchanges between companies.
+
+Your PRIMARY mission is to find CREATIVE, REALISTIC collaboration opportunities based on:
+1. WEB RESEARCH DATA (if available) - real information about the companies
+2. MEMBER PROFILE DATA - what they explicitly state they need/offer
+
+Focus on:
+- CREATIVE COLLABORATION: Innovative ways to work together (co-creation, joint ventures, partnerships)
+- NETWORK EFFECTS: How each person's connections can benefit the other
+- DIRECT MATCHES: Asset-need alignments
+
+CRITICAL: If web research provides REAL company information, use it. If not, work with profile data and be honest about uncertainty.`;
+
+    const userPrompt = `Discover creative collaboration opportunities:
+
+**MEMBER 1: ${member1.name}** (${member1.role} at ${member1.org})
+Industry: ${member1.industry}
+Revenue Model: ${member1.rev_driver || 'Not specified'}
+Current Challenge: ${member1.current_constraint || 'Not specified'}
+Assets: ${member1.assets || 'Not specified'}
+Needs: ${member1.needs || 'Not specified'}
+
+**MEMBER 2: ${member2.name}** (${member2.role} at ${member2.org})
+Industry: ${member2.industry}
+Revenue Model: ${member2.rev_driver || 'Not specified'}
+Current Challenge: ${member2.current_constraint || 'Not specified'}
+Assets: ${member2.assets || 'Not specified'}
+Needs: ${member2.needs || 'Not specified'}
+
+${webContext ? `**WEB RESEARCH FINDINGS:**\n${webContext}\n` : '**NOTE:** No web data available - analysis based on profiles only.'}
+
+Return JSON:
+{
+  "creative_collaboration_ideas": ["Specific idea 1", "Specific idea 2", "Specific idea 3"],
+  "direct_matches": "Description of explicit asset-need matches",
+  "network_value": "How their networks can benefit each other",
+  "top_3_opportunities": ["Opportunity 1", "Opportunity 2", "Opportunity 3"],
+  "value_rating": "high|medium|low",
+  "confidence": 0-100,
+  "web_research_used": true|false
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 1000,
+      response_format: { type: 'json_object' }
+    });
+
+    const result = JSON.parse(response.choices[0].message.content);
+    result.web_sources = sources; // Attach sources for verification
+    result.web_research_used = sources.length > 0;
+
+    console.log(`   ✅ Research complete: ${result.creative_collaboration_ideas?.length || 0} creative ideas, web: ${result.web_research_used}`);
+    return result;
+
+  } catch (error) {
+    console.error(`   ❌ Complementary value research failed:`, error.message);
+    return {
+      creative_collaboration_ideas: [],
+      direct_matches: 'Research failed',
+      network_value: 'Research failed',
+      top_3_opportunities: [],
+      value_rating: 'low',
+      confidence: 0,
+      web_research_used: false,
+      error: error.message
+    };
+  }
 }
 
 // API Routes

@@ -20,6 +20,7 @@
 // ============================================================================
 
 const OpenAI = require('openai');
+const { tavily } = require('@tavily/core');
 const db = require('./db');
 
 // Import V3.5+ components for speed
@@ -29,6 +30,9 @@ const nexusV35 = require('./nexus-v3.5');
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Initialize Tavily client for web search
+const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
 
 // ============================================================================
 // PRODUCTION MATCH GENERATION (V3.5+ Engine + V2 Output Format)
@@ -159,45 +163,166 @@ async function gatherIntelligence(member1, member2) {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`✅ Intelligence gathered in ${elapsed}s`);
 
+  // Extract web research results with sources
+  const member1Research = results[0].status === 'fulfilled' ? results[0].value : null;
+  const member2Research = results[1].status === 'fulfilled' ? results[1].value : null;
+  const industryResearch = results[2].status === 'fulfilled' ? results[2].value : null;
+  const marketResearch = results[3].status === 'fulfilled' ? results[3].value : null;
+
+  // Collect all sources for transparency
+  const allSources = [
+    ...(member1Research?.sources || []),
+    ...(member2Research?.sources || []),
+    ...(industryResearch?.sources || [])
+  ];
+
   return {
-    member1_company_news: results[0].status === 'fulfilled' ? results[0].value : null,
-    member2_company_news: results[1].status === 'fulfilled' ? results[1].value : null,
-    industry_trends: results[2].status === 'fulfilled' ? results[2].value : null,
-    market_context: results[3].status === 'fulfilled' ? results[3].value : null,
-    member1_industry_trends: results[2].status === 'fulfilled' ? results[2].value : null,
-    member2_industry_trends: results[2].status === 'fulfilled' ? results[2].value : null,
+    // Company research with sources
+    member1_company_news: member1Research?.summary || 'No web data available',
+    member2_company_news: member2Research?.summary || 'No web data available',
+
+    // Industry research with sources
+    industry_trends: industryResearch?.summary || 'No web data available',
+    member1_industry_trends: industryResearch?.summary || 'No web data available',
+    member2_industry_trends: industryResearch?.summary || 'No web data available',
+
+    // Market context (still using GPT analysis for timing/strategy)
+    market_context: marketResearch || { timing: 'Analysis based on profile data', opportunities: [], factors: [] },
+
+    // Profile analysis placeholders
     member1_profile_analysis: { strengths: [], opportunities: [], hidden_value: [] },
     member2_profile_analysis: { strengths: [], opportunities: [], hidden_value: [] },
     cross_industry_partnerships: null,
-    errors: []
+
+    // CRITICAL: Include all web sources for verification
+    web_sources: allSources,
+    research_timestamp: new Date().toISOString(),
+    errors: results.filter(r => r.status === 'rejected').map(r => r.reason?.message || 'Unknown error')
   };
 }
 
 async function analyzeCompanyContext(member, num) {
-  const prompt = `Brief context about ${member.org} in ${member.industry}. Recent developments, market position, achievements. Max 150 words.`;
+  try {
+    // REAL WEB SEARCH using Tavily
+    const searchQuery = `${member.org} ${member.industry} company news recent developments 2024 2025`;
+    console.log(`   🔍 Web search: "${searchQuery}"`);
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
-    max_tokens: 250
-  });
+    const searchResults = await tavilyClient.search(searchQuery, {
+      maxResults: 3,
+      searchDepth: 'basic',
+      includeAnswer: true
+    });
 
-  return response.choices[0].message.content;
+    // Use Tavily's AI-generated answer if available, otherwise summarize results
+    if (searchResults.answer) {
+      console.log(`   ✅ Found web data for ${member.org}`);
+      return {
+        summary: searchResults.answer,
+        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+      };
+    }
+
+    // Fallback: summarize search results with GPT
+    if (searchResults.results && searchResults.results.length > 0) {
+      const context = searchResults.results.map((r, i) =>
+        `[${i + 1}] ${r.title}: ${r.content}`
+      ).join('\n\n');
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: `Summarize this web research about ${member.org}: ${context}. Max 150 words.`
+        }],
+        temperature: 0.3,
+        max_tokens: 250
+      });
+
+      console.log(`   ✅ Synthesized web data for ${member.org}`);
+      return {
+        summary: response.choices[0].message.content,
+        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+      };
+    }
+
+    // No results found - return null (not hallucination)
+    console.log(`   ⚠️  No web data found for ${member.org}`);
+    return {
+      summary: `No recent web information found for ${member.org}. Analysis will proceed based on member profile data only.`,
+      sources: []
+    };
+
+  } catch (error) {
+    console.error(`   ❌ Web search failed for ${member.org}:`, error.message);
+    return {
+      summary: `Web search temporarily unavailable. Analysis based on profile data only.`,
+      sources: [],
+      error: error.message
+    };
+  }
 }
 
 async function analyzeIndustryTrends(industry1, industry2) {
-  const industries = industry1 === industry2 ? industry1 : `${industry1} and ${industry2}`;
-  const prompt = `Top 3 trends in ${industries} for 2024-2025. Business implications. Max 150 words.`;
+  try {
+    const industries = industry1 === industry2 ? industry1 : `${industry1} and ${industry2}`;
 
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-    max_tokens: 250
-  });
+    // REAL WEB SEARCH for industry trends
+    const searchQuery = `${industries} industry trends 2024 2025 business opportunities challenges`;
+    console.log(`   🔍 Web search: "${searchQuery}"`);
 
-  return response.choices[0].message.content;
+    const searchResults = await tavilyClient.search(searchQuery, {
+      maxResults: 4,
+      searchDepth: 'basic',
+      includeAnswer: true
+    });
+
+    // Use Tavily's AI-generated answer if available
+    if (searchResults.answer) {
+      console.log(`   ✅ Found industry trend data`);
+      return {
+        summary: searchResults.answer,
+        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+      };
+    }
+
+    // Fallback: synthesize from search results
+    if (searchResults.results && searchResults.results.length > 0) {
+      const context = searchResults.results.map((r, i) =>
+        `[${i + 1}] ${r.title}: ${r.content}`
+      ).join('\n\n');
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: `Based on this web research, identify top 3 trends in ${industries} for 2024-2025 with business implications:\n\n${context}`
+        }],
+        temperature: 0.7,
+        max_tokens: 300
+      });
+
+      console.log(`   ✅ Synthesized industry trends from web data`);
+      return {
+        summary: response.choices[0].message.content,
+        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+      };
+    }
+
+    // No results - return null
+    console.log(`   ⚠️  No industry trend data found`);
+    return {
+      summary: `No recent industry trend data found for ${industries}.`,
+      sources: []
+    };
+
+  } catch (error) {
+    console.error(`   ❌ Industry trends search failed:`, error.message);
+    return {
+      summary: `Web search temporarily unavailable for industry trends.`,
+      sources: [],
+      error: error.message
+    };
+  }
 }
 
 async function analyzeMarketContext(member1, member2) {
@@ -379,13 +504,29 @@ async function performQualityControl(member1, member2, intelligence, agentOutput
     };
   }
 
+  // Build list of web sources for transparency
+  const webSourcesList = intelligence.web_sources && intelligence.web_sources.length > 0
+    ? intelligence.web_sources.map((s, i) => `[${i + 1}] ${s.title} - ${s.url}`).join('\n')
+    : 'No web sources available - analysis based on member profiles only';
+
   const prompt = `You are the Quality Control layer of a multi-agent AI system. Your critical role is to verify synthesis outputs and provide SPECIFIC, EVIDENCE-BASED reasoning.
 
 SYNTHESIS TO VERIFY:
 ${JSON.stringify(synthesis, null, 2)}
 
-RAW DATA FROM INTELLIGENCE GATHERING:
-${JSON.stringify(intelligence, null, 2)}
+RAW DATA FROM WEB RESEARCH (${intelligence.research_timestamp || 'timestamp unavailable'}):
+Company Research:
+- ${member1.org}: ${intelligence.member1_company_news}
+- ${member2.org}: ${intelligence.member2_company_news}
+
+Industry Trends:
+${intelligence.industry_trends}
+
+Market Context:
+${JSON.stringify(intelligence.market_context, null, 2)}
+
+WEB SOURCES (for fact-checking):
+${webSourcesList}
 
 AGENT ANALYSIS OUTPUTS:
 ${JSON.stringify(agentOutputs, null, 2)}
@@ -394,34 +535,40 @@ MEMBER PROFILES:
 - ${member1.name} at ${member1.org} (${member1.industry}): "${member1.rev_driver || 'N/A'}" | Needs: "${member1.needs || 'N/A'}" | Assets: "${member1.assets || 'N/A'}"
 - ${member2.name} at ${member2.org} (${member2.industry}): "${member2.rev_driver || 'N/A'}" | Needs: "${member2.needs || 'N/A'}" | Assets: "${member2.assets || 'N/A'}"
 
-YOUR CRITICAL TASK - Be SPECIFIC and EVIDENCE-BASED:
+YOUR CRITICAL TASK - VERIFY AGAINST REAL WEB SOURCES:
 
-1. VERIFY each claim against the raw data - cite SPECIFIC evidence
-2. Explain WHY you reached each conclusion with reasoning
-3. Explain WHY confidence levels are what they are
-4. Provide SPECIFIC CONFIRMATIONS like "${member1.name}'s company does X which directly addresses ${member2.name}'s need for Y"
+1. Check if agent claims align with WEB RESEARCH DATA (not hallucinations)
+2. Verify industry trends match actual web-sourced information
+3. Confirm company information against web search results
+4. Flag any claims that contradict web sources or lack supporting evidence
+5. Provide SPECIFIC confirmations citing web sources or profile data
 
 Return JSON with these fields:
 {
-  "verified_synthesis": "Write 2-3 paragraphs that explain: (1) WHAT was confirmed and WHY - cite specific profile data like '${member1.name} stated they need X, and ${member2.name} offers Y which directly addresses this', (2) SPECIFIC areas of confirmation - reference actual quotes/data from profiles, (3) Any gaps or areas requiring further exploration. Be SPECIFIC - name names, cite profile details, explain reasoning.",
+  "verified_synthesis": "Write 2-3 paragraphs that explain: (1) WHAT was confirmed by WEB SOURCES vs member profiles - cite specific web findings, (2) How web research supports or contradicts agent analysis, (3) Any gaps where web data is unavailable. Be SPECIFIC - reference actual web sources by number [1], [2], etc.",
 
-  "why_we_concluded_this": "Explain the logical chain: 'We concluded X because ${member1.name}'s profile mentions A, ${member2.name}'s profile shows B, and the business synergy agent identified C specific opportunities. This led us to score...'",
+  "why_we_concluded_this": "Explain the logical chain: 'We concluded X because web research [source 1] shows ${member1.org} is doing A, ${member2.name}'s profile shows B, and the business synergy agent identified C specific opportunities. This led us to score...'",
 
-  "confidence_reasoning": "Explain WHY confidence is HIGH/MEDIUM/LOW: 'HIGH confidence on revenue potential because both profiles explicitly mention compatible revenue models. MEDIUM confidence on innovation because while ${member1.name} mentions interest in X, ${member2.name}'s capabilities in this area are not explicitly stated. LOW confidence on network effects because...'",
+  "confidence_reasoning": "Explain WHY confidence is HIGH/MEDIUM/LOW based on WEB SOURCE AVAILABILITY: 'HIGH confidence on ${member1.org} because web sources [1,2] confirm recent developments. MEDIUM confidence on collaboration potential because while ${member1.name} mentions X in their profile, web data doesn't confirm ${member2.org}'s capabilities. LOW confidence on market timing because web sources show conflicting trends...'",
 
   "specific_confirmations": [
-    "${member1.name}'s stated need for 'X' directly matches ${member2.name}'s asset of 'Y'",
-    "Both operate in ${member1.industry || 'their industry'} suggesting shared market understanding",
-    "List 3-5 SPECIFIC confirmations citing actual profile data"
+    "Web source [1] confirms ${member1.org} operates in ${member1.industry}",
+    "${member1.name}'s stated need for 'X' matches ${member2.name}'s asset 'Y' (profile-verified)",
+    "Industry trends from web sources [2,3] support agent analysis of market opportunity",
+    "List 3-5 SPECIFIC confirmations citing web sources or profile data"
   ],
 
-  "areas_of_uncertainty": ["List specific claims that lack direct evidence and explain why"],
+  "areas_of_uncertainty": [
+    "No web data available for ${member2.org} - relying on profile only",
+    "Agent claim about X cannot be verified against available sources",
+    "List specific claims that lack web or profile evidence"
+  ],
 
   "verification_score": 85,
   "quality_score": 88
 }
 
-CRITICAL: Reference ACTUAL data from profiles. Do NOT make generic statements. Every claim must tie back to specific profile content.`;
+CRITICAL: Reference ACTUAL web sources by number [1], [2], etc. or ACTUAL profile data. Do NOT make unverified claims.`;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
