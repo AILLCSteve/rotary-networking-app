@@ -134,25 +134,10 @@ async function L0_normalize(member1, member2, emit) {
 
 // Helper: Get or create embedding for a member
 async function getOrCreateEmbedding(member) {
-  // Check if embedding already exists in DB
-  try {
-    const cached = await db.get(
-      `SELECT profile_embedding FROM members WHERE member_id = $1 AND profile_embedding IS NOT NULL`,
-      [member.member_id]
-    );
+  // NOTE: Caching disabled due to missing profile_embedding column in production DB
+  // Embeddings are already stored in vectors table, so this is redundant anyway
 
-    if (cached && cached.profile_embedding) {
-      const embedding = JSON.parse(cached.profile_embedding);
-      if (embedding.length === 1536) {
-        console.log(`   💾 Using cached embedding for ${member.name}`);
-        return embedding;
-      }
-    }
-  } catch (err) {
-    console.log(`   ⚠️  Could not load cached embedding: ${err.message}`);
-  }
-
-  // Generate new embedding
+  // Generate embedding (always fresh for now)
   const text = `${member.name} - ${member.role} at ${member.org}. Industry: ${member.industry}. Location: ${member.city}. Assets: ${member.assets || 'none'}. Needs: ${member.needs || 'none'}. Challenge: ${member.current_constraint || 'none'}.`;
 
   const response = await openai.embeddings.create({
@@ -161,17 +146,6 @@ async function getOrCreateEmbedding(member) {
   });
 
   const embedding = response.data[0].embedding;
-
-  // Store in database
-  try {
-    await db.run(
-      `UPDATE members SET profile_embedding = $1 WHERE member_id = $2`,
-      [JSON.stringify(embedding), member.member_id]
-    );
-    console.log(`   💾 Cached new embedding for ${member.name}`);
-  } catch (err) {
-    console.log(`   ⚠️  Could not cache embedding: ${err.message}`);
-  }
 
   return embedding;
 }
