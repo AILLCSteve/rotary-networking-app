@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const OpenAI = require('openai');
 const { tavily } = require('@tavily/core');
+const pLimit = require('p-limit');
 const crypto = require('crypto');
 const db = require('./db');
 const nexusV2 = require('./nexus-v2');
@@ -22,6 +23,29 @@ const openai = new OpenAI({
 
 // Tavily client for web search
 const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+
+// Rate limiting for Tavily API (shared across all requests)
+const tavilyLimit = pLimit(3); // Max 3 concurrent Tavily searches
+
+// Helper: Tavily search with rate limiting + retry logic
+async function tavilySearchWithRetry(query, options, retries = 2) {
+  return tavilyLimit(async () => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await tavilyClient.search(query, options);
+        return result;
+      } catch (error) {
+        if (attempt === retries) {
+          console.error(`   ❌ Tavily search failed after ${retries + 1} attempts:`, error.message);
+          throw error;
+        }
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`   ⚠️  Tavily search failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  });
+}
 
 // Middleware
 app.use(express.json());
@@ -826,7 +850,7 @@ async function researchComplementaryValue(member1, member2) {
     let sources = [];
 
     try {
-      const searchResults = await tavilyClient.search(searchQuery, {
+      const searchResults = await tavilySearchWithRetry(searchQuery, {
         maxResults: 2,
         searchDepth: 'basic'
       });

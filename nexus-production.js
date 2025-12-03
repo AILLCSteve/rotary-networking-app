@@ -21,6 +21,7 @@
 
 const OpenAI = require('openai');
 const { tavily } = require('@tavily/core');
+const pLimit = require('p-limit');
 const db = require('./db');
 
 // Import V3.5+ components for speed
@@ -33,6 +34,34 @@ const openai = new OpenAI({
 
 // Initialize Tavily client for web search
 const tavilyClient = tavily({ apiKey: process.env.TAVILY_API_KEY });
+
+// ============================================================================
+// RATE LIMITING: Prevent overwhelming Tavily API with concurrent requests
+// ============================================================================
+// Tavily free tier: ~5-10 requests/second recommended
+// This limits concurrent searches across ALL match generations
+const tavilyLimit = pLimit(3); // Max 3 concurrent Tavily searches at once
+
+// Helper: Tavily search with rate limiting + retry logic
+async function tavilySearchWithRetry(query, options, retries = 2) {
+  return tavilyLimit(async () => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await tavilyClient.search(query, options);
+        return result;
+      } catch (error) {
+        if (attempt === retries) {
+          console.error(`   ❌ Tavily search failed after ${retries + 1} attempts:`, error.message);
+          throw error;
+        }
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`   ⚠️  Tavily search failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  });
+}
 
 // ============================================================================
 // HELPER: Save research and regenerate embedding with web data
@@ -243,11 +272,11 @@ async function gatherIntelligence(member1, member2) {
 
   // CRITICAL: Save research to database for embedding enhancement
   // This happens async - don't await to avoid blocking
-  if (member1Research) {
-    saveCompanyResearchAndRegenerateEmbedding(member1.member_id, member1Research, industryResearch, member1Research.sources);
+  if (member1Research && member1Research.summary) {
+    saveCompanyResearchAndRegenerateEmbedding(member1.member_id, member1Research, industryResearch, member1Research.sources || []);
   }
-  if (member2Research) {
-    saveCompanyResearchAndRegenerateEmbedding(member2.member_id, member2Research, industryResearch, member2Research.sources);
+  if (member2Research && member2Research.summary) {
+    saveCompanyResearchAndRegenerateEmbedding(member2.member_id, member2Research, industryResearch, member2Research.sources || []);
   }
 
   return {
@@ -277,11 +306,11 @@ async function gatherIntelligence(member1, member2) {
 
 async function analyzeCompanyContext(member, num) {
   try {
-    // REAL WEB SEARCH using Tavily
+    // REAL WEB SEARCH using Tavily (rate-limited + retry)
     const searchQuery = `${member.org} ${member.industry} company news recent developments 2024 2025`;
     console.log(`   🔍 Web search: "${searchQuery}"`);
 
-    const searchResults = await tavilyClient.search(searchQuery, {
+    const searchResults = await tavilySearchWithRetry(searchQuery, {
       maxResults: 3,
       searchDepth: 'basic',
       includeAnswer: true
@@ -292,7 +321,7 @@ async function analyzeCompanyContext(member, num) {
       console.log(`   ✅ Found web data for ${member.org}`);
       return {
         summary: searchResults.answer,
-        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+        sources: (searchResults.results || []).map(r => ({ title: r.title, url: r.url }))
       };
     }
 
@@ -315,7 +344,7 @@ async function analyzeCompanyContext(member, num) {
       console.log(`   ✅ Synthesized web data for ${member.org}`);
       return {
         summary: response.choices[0].message.content,
-        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+        sources: (searchResults.results || []).map(r => ({ title: r.title, url: r.url }))
       };
     }
 
@@ -340,11 +369,11 @@ async function analyzeIndustryTrends(industry1, industry2) {
   try {
     const industries = industry1 === industry2 ? industry1 : `${industry1} and ${industry2}`;
 
-    // REAL WEB SEARCH for industry trends
+    // REAL WEB SEARCH for industry trends (rate-limited + retry)
     const searchQuery = `${industries} industry trends 2024 2025 business opportunities challenges`;
     console.log(`   🔍 Web search: "${searchQuery}"`);
 
-    const searchResults = await tavilyClient.search(searchQuery, {
+    const searchResults = await tavilySearchWithRetry(searchQuery, {
       maxResults: 4,
       searchDepth: 'basic',
       includeAnswer: true
@@ -355,7 +384,7 @@ async function analyzeIndustryTrends(industry1, industry2) {
       console.log(`   ✅ Found industry trend data`);
       return {
         summary: searchResults.answer,
-        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+        sources: (searchResults.results || []).map(r => ({ title: r.title, url: r.url }))
       };
     }
 
@@ -378,7 +407,7 @@ async function analyzeIndustryTrends(industry1, industry2) {
       console.log(`   ✅ Synthesized industry trends from web data`);
       return {
         summary: response.choices[0].message.content,
-        sources: searchResults.results.map(r => ({ title: r.title, url: r.url }))
+        sources: (searchResults.results || []).map(r => ({ title: r.title, url: r.url }))
       };
     }
 
