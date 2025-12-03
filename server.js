@@ -1242,16 +1242,27 @@ app.get('/api/generate-status/:memberId', async (req, res) => {
   try {
     const { memberId } = req.params;
 
-    const status = await db.get(`
-      SELECT status, started_at, completed_at, error
-      FROM generation_status
-      WHERE member_id = $1
-      ORDER BY started_at DESC
-      LIMIT 1
-    `, [memberId]);
+    // Try to query status (table may not exist yet on first deploy)
+    let status = null;
+    try {
+      status = await db.get(`
+        SELECT status, started_at, completed_at, error
+        FROM generation_status
+        WHERE member_id = $1
+        ORDER BY started_at DESC
+        LIMIT 1
+      `, [memberId]);
+    } catch (dbError) {
+      // If table doesn't exist yet (42P01 = relation does not exist)
+      if (dbError.code === '42P01') {
+        console.log('generation_status table does not exist yet, returning not_started');
+        return res.json({ status: 'not_started', results_count: 0 });
+      }
+      throw dbError; // Re-throw other errors
+    }
 
     if (!status) {
-      return res.json({ status: 'not_started' });
+      return res.json({ status: 'not_started', results_count: 0 });
     }
 
     // Check if we have results
@@ -1287,7 +1298,19 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    // Check if already processing
+    // Create status tracking table if not exists (MUST BE FIRST)
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS generation_status (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        error TEXT
+      )
+    `);
+
+    // Check if already processing (AFTER table creation)
     const existingStatus = await db.get(`
       SELECT status FROM generation_status
       WHERE member_id = $1 AND status = 'processing'
@@ -1301,18 +1324,6 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
         message: 'Match generation already in progress'
       });
     }
-
-    // Create status tracking table if not exists
-    await db.run(`
-      CREATE TABLE IF NOT EXISTS generation_status (
-        id SERIAL PRIMARY KEY,
-        member_id TEXT NOT NULL,
-        status TEXT NOT NULL,
-        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        completed_at TIMESTAMP,
-        error TEXT
-      )
-    `);
 
     // Mark as processing
     await db.run(`
