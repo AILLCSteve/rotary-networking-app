@@ -1237,20 +1237,102 @@ Be specific to these actual people and organizations. No generic advice.`;
   }
 });
 
-// Generate top 3 matches
+// Check generation status (for polling)
+app.get('/api/generate-status/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+
+    const status = await db.get(`
+      SELECT status, started_at, completed_at, error
+      FROM generation_status
+      WHERE member_id = $1
+      ORDER BY started_at DESC
+      LIMIT 1
+    `, [memberId]);
+
+    if (!status) {
+      return res.json({ status: 'not_started' });
+    }
+
+    // Check if we have results
+    const resultsCount = await db.get(`
+      SELECT COUNT(*)::int as count
+      FROM intros
+      WHERE for_member_id = $1 AND tier = 'top3'
+    `, [memberId]);
+
+    res.json({
+      status: status.status,
+      started_at: status.started_at,
+      completed_at: status.completed_at,
+      error: status.error,
+      results_count: resultsCount?.count || 0
+    });
+  } catch (error) {
+    console.error('Status check error:', error);
+    res.status(500).json({ error: 'Failed to check status' });
+  }
+});
+
+// Generate top 3 matches (ASYNC - returns immediately, processes in background)
 app.post('/api/generate-top3/:memberId', async (req, res) => {
   try {
     const { memberId } = req.params;
-    console.log(`🎯 Generating top 3 matches for member: ${memberId}`);
+    console.log(`🎯 Generating top 3 matches for member: ${memberId} (async mode)`);
 
-    // Get member and their embedding
+    // Quick validation only
     const member = await db.get('SELECT * FROM members WHERE member_id = $1', [memberId]);
     if (!member) {
       console.error(`❌ Member not found: ${memberId}`);
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    let memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
+    // Check if already processing
+    const existingStatus = await db.get(`
+      SELECT status FROM generation_status
+      WHERE member_id = $1 AND status = 'processing'
+    `, [memberId]);
+
+    if (existingStatus) {
+      console.log(`⚠️  Already processing matches for ${member.name}`);
+      return res.json({
+        success: true,
+        status: 'processing',
+        message: 'Match generation already in progress'
+      });
+    }
+
+    // Create status tracking table if not exists
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS generation_status (
+        id SERIAL PRIMARY KEY,
+        member_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMP,
+        error TEXT
+      )
+    `);
+
+    // Mark as processing
+    await db.run(`
+      INSERT INTO generation_status (member_id, status)
+      VALUES ($1, 'processing')
+    `, [memberId]);
+
+    // Return immediately - client can close screen now!
+    res.json({
+      success: true,
+      status: 'processing',
+      message: 'Match generation started. You can close this screen - results will be ready when you return.'
+    });
+
+    // Continue processing in background (fire-and-forget)
+    setImmediate(async () => {
+      try {
+        console.log(`🚀 Background processing started for ${member.name}`);
+
+        let memberVector = await db.get('SELECT embedding_ops FROM vectors WHERE member_id = $1', [memberId]);
 
     // Auto-generate embedding if missing (for test data or new members)
     if (!memberVector || !memberVector.embedding_ops) {
@@ -1428,15 +1510,38 @@ app.post('/api/generate-top3/:memberId', async (req, res) => {
       }
     }
 
-    console.log(`✅ Successfully generated ${top3.length} top 3 matches for ${member.name}`);
-    res.json({ success: true, count: top3.length });
+        console.log(`✅ Successfully generated ${top3.length} top 3 matches for ${member.name}`);
+
+        // Mark as completed
+        await db.run(`
+          UPDATE generation_status
+          SET status = 'completed', completed_at = CURRENT_TIMESTAMP
+          WHERE member_id = $1 AND status = 'processing'
+        `, [memberId]);
+
+        console.log(`🎉 Background processing completed for ${member.name}`);
+      } catch (bgError) {
+        console.error('❌ Background processing error:', bgError);
+        console.error('Error stack:', bgError.stack);
+
+        // Mark as failed
+        try {
+          await db.run(`
+            UPDATE generation_status
+            SET status = 'failed', completed_at = CURRENT_TIMESTAMP, error = $2
+            WHERE member_id = $1 AND status = 'processing'
+          `, [memberId, bgError.message]);
+        } catch (statusError) {
+          console.error('Failed to update status:', statusError);
+        }
+      }
+    });
+
   } catch (error) {
-    console.error('Generate top3 error:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Generate top3 endpoint error:', error);
     res.status(500).json({
-      error: 'Failed to generate matches',
-      message: error.message,
-      details: error.stack
+      error: 'Failed to start match generation',
+      message: error.message
     });
   }
 });

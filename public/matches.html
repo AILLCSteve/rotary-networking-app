@@ -2201,15 +2201,17 @@
             }, 800);
         }
 
-        // Generate Top 3 with V2-style progress overlay
+        // Generate Top 3 with V2-style progress overlay (ASYNC - continues if screen closes)
         document.getElementById('generateTop3').addEventListener('click', async () => {
             const btn = document.getElementById('generateTop3');
 
             showProgressOverlay(
                 '⚡ Generating Your Top 3 Matches',
-                'Running NEXUS Production with 5 parallel AI agents per match',
+                '💡 You can close this screen! Processing continues on the server. Results will be here when you return.',
                 '25',
                 [
+                    'Starting match generation...',
+                    'Processing runs in background',
                     'Analyzing your profile and needs',
                     'Scoring all potential matches',
                     'Selecting top 3 candidates',
@@ -2218,33 +2220,75 @@
                     'Match 3/3: Multi-agent analysis',
                     'Synthesizing strategic opportunities',
                     'Quality control & fact-checking',
-                    'Generating conversation starters'
+                    'Generating conversation starters',
+                    'Almost done...'
                 ]
             );
 
             btn.disabled = true;
 
             try {
+                // Trigger generation (returns immediately)
                 const response = await fetch(`/api/generate-top3/${memberId}`, {
                     method: 'POST'
                 });
                 const result = await response.json();
 
-                if (result.success) {
-                    hideProgressOverlay();
-                    setTimeout(() => loadDashboard(), 1000);
-                } else {
-                    throw new Error(result.error || 'Failed to generate matches');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to start match generation');
                 }
+
+                console.log('✅ Match generation started:', result.message);
+
+                // Poll for completion (checks every 3 seconds)
+                const pollInterval = 3000;
+                const maxPolls = 100; // 5 minutes max
+                let pollCount = 0;
+
+                const checkStatus = async () => {
+                    try {
+                        const statusResponse = await fetch(`/api/generate-status/${memberId}`);
+                        const status = await statusResponse.json();
+
+                        console.log(`📊 Status check (${pollCount + 1}/${maxPolls}):`, status.status, `(${status.results_count} results)`);
+
+                        if (status.status === 'completed' && status.results_count >= 3) {
+                            // Success! Load results
+                            console.log('🎉 Match generation completed!');
+                            hideProgressOverlay();
+                            setTimeout(() => loadDashboard(), 500);
+                            btn.disabled = false;
+                            return true;
+                        } else if (status.status === 'failed') {
+                            // Failed
+                            throw new Error(status.error || 'Match generation failed on server');
+                        } else if (pollCount >= maxPolls) {
+                            // Timeout
+                            throw new Error('Match generation is taking longer than expected. Please refresh the page in a minute to check results.');
+                        } else {
+                            // Still processing, continue polling
+                            pollCount++;
+                            setTimeout(checkStatus, pollInterval);
+                        }
+                    } catch (error) {
+                        hideProgressOverlay();
+                        console.error('Status check error:', error);
+                        alert('❌ ' + error.message);
+                        btn.disabled = false;
+                    }
+                };
+
+                // Start polling after 2 seconds (give it a head start)
+                setTimeout(checkStatus, 2000);
+
             } catch (error) {
                 hideProgressOverlay();
                 console.error('Full error:', error);
-                let errorMsg = '❌ Failed to generate matches: ' + error.message;
+                let errorMsg = '❌ Failed to start match generation: ' + error.message;
                 if (error.message.includes('JSON')) {
                     errorMsg += '\n\nThis might be a server error. Check the Render logs for details.';
                 }
                 alert(errorMsg);
-            } finally {
                 btn.disabled = false;
             }
         });
@@ -2313,8 +2357,78 @@
             }
         });
 
-        // Initial load
-        loadDashboard();
+        // Check if match generation is in progress on page load (resume polling)
+        async function checkAndResumeGeneration() {
+            try {
+                const statusResponse = await fetch(`/api/generate-status/${memberId}`);
+                const status = await statusResponse.json();
+
+                if (status.status === 'processing') {
+                    console.log('📊 Found ongoing match generation, resuming polling...');
+
+                    // Show progress overlay
+                    showProgressOverlay(
+                        '⚡ Match Generation In Progress',
+                        '💡 Your matches are being generated. You can close this screen and come back later.',
+                        '25',
+                        [
+                            'Resuming match generation...',
+                            'Processing continues on server',
+                            'This may take a few minutes'
+                        ]
+                    );
+
+                    const btn = document.getElementById('generateTop3');
+                    btn.disabled = true;
+
+                    // Poll for completion
+                    const pollInterval = 3000;
+                    const maxPolls = 100;
+                    let pollCount = 0;
+
+                    const checkStatus = async () => {
+                        try {
+                            const statusResponse = await fetch(`/api/generate-status/${memberId}`);
+                            const status = await statusResponse.json();
+
+                            console.log(`📊 Status check (${pollCount + 1}/${maxPolls}):`, status.status, `(${status.results_count} results)`);
+
+                            if (status.status === 'completed' && status.results_count >= 3) {
+                                console.log('🎉 Match generation completed!');
+                                hideProgressOverlay();
+                                setTimeout(() => loadDashboard(), 500);
+                                btn.disabled = false;
+                                return true;
+                            } else if (status.status === 'failed') {
+                                throw new Error(status.error || 'Match generation failed on server');
+                            } else if (pollCount >= maxPolls) {
+                                throw new Error('Match generation is taking longer than expected. Please refresh the page in a minute.');
+                            } else {
+                                pollCount++;
+                                setTimeout(checkStatus, pollInterval);
+                            }
+                        } catch (error) {
+                            hideProgressOverlay();
+                            console.error('Status check error:', error);
+                            alert('❌ ' + error.message);
+                            btn.disabled = false;
+                            loadDashboard(); // Load whatever results exist
+                        }
+                    };
+
+                    setTimeout(checkStatus, 2000);
+                } else {
+                    // Not processing, just load dashboard normally
+                    loadDashboard();
+                }
+            } catch (error) {
+                console.error('Failed to check generation status:', error);
+                loadDashboard(); // Fallback to normal load
+            }
+        }
+
+        // Initial load (checks for ongoing generation first)
+        checkAndResumeGeneration();
 
         // Auto-refresh DISABLED when any card is expanded
         // Only refresh when all cards are collapsed (user not reading)
