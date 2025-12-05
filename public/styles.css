@@ -1,5 +1,5 @@
 /* ========================================
-   ROTARY NETWORKING APP - ENHANCED VISUAL DESIGN
+   ADDITIONAL INTELLIGENCE, LLC - NETWORK NAVIGATION PLATFORM
    Modern Glassmorphism + Gradient + Animation
    ======================================== */
 
@@ -56,22 +56,22 @@ body {
 
 /* Images from root /images folder with slow transitions */
 .bg-slide:nth-child(1) {
-  background-image: url('/images/gooddreams.png');
+  background-image: url('/images/AILLCLogo.png');
   animation-delay: 0s;
 }
 
 .bg-slide:nth-child(2) {
-  background-image: url('/images/results.png');
+  background-image: url('/images/AILLCLogoNOBG.png');
   animation-delay: 37s;
 }
 
 .bg-slide:nth-child(3) {
-  background-image: url('/images/change.jpg');
+  background-image: url('/images/AILLCLogo.png');
   animation-delay: 74s;
 }
 
 .bg-slide:nth-child(4) {
-  background-image: url('/images/evolution.jpg');
+  background-image: url('/images/AILLCLogoNOBG.png');
   animation-delay: 111s;
 }
 
